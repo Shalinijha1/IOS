@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>Glassline OS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="os.css">
+</head>
+<body>
+<!-- Glassline OS: an original, iOS-style phone shell that runs in a browser.
+     Not affiliated with Apple. No Apple code, logos, icons, fonts, sounds or wallpapers are used. -->
+<div id="stage">
+  <div id="frame">
+    <button class="hw" id="hwPower" title="Side button: click to lock/wake, hold for assistant, hold longer for power off (key: L)"></button>
+    <button class="hw" id="hwVolUp" title="Volume up (key: +)"></button>
+    <button class="hw" id="hwVolDown" title="Volume down (key: -)"></button>
+    <button class="hw" id="hwAction" title="Action button: toggles Silent mode"></button>
+    <div id="screen">
+      <div id="wall"></div>
+
+      <!-- Home: Today view (page -1), app pages, App Library (last page) -->
+      <section id="home">
+        <div id="pages"></div>
+        <div id="dots"></div>
+        <div id="searchPill" class="glass">Search</div>
+        <div id="dock" class="glass"></div>
+        <button id="doneBtn" class="glass">Done</button>
+      </section>
+
+      <section id="windows"></section>
+      <section id="switcher"><div id="cards"></div><div id="switcherEmpty">No recent apps</div></section>
+
+      <section id="spotlight">
+        <div class="sp-head"><div class="sp-field glass"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><input id="spInput" placeholder="Search or ask" autocomplete="off" spellcheck="false"></div><button id="spCancel">Cancel</button></div>
+        <div id="spBody"></div>
+      </section>
+
+      <!-- Cover Sheet: the lock screen, and Notification Centre when pulled down while unlocked -->
+      <section id="cover">
+        <div id="lockIcon"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path id="shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+        <div id="lockDate"></div>
+        <div id="lockClock"></div>
+        <div id="lockWidgets"></div>
+        <div id="ncList"></div>
+        <div id="ncEmpty">No older notifications</div>
+        <button class="lock-btn glass" id="lockTorch" title="Flashlight (press and hold)"><svg viewBox="0 0 24 24"><path d="M8 2h8v4l-2 4v11a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V10L8 6z"/></svg></button>
+        <button class="lock-btn glass" id="lockCam" title="Camera (press and hold, or swipe left)"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        <div id="lockHint">Swipe up to open</div>
+        <div id="passcode">
+          <div class="pc-title">Enter Passcode</div>
+          <div class="pc-dots"></div>
+          <div class="pc-pad"></div>
+          <div class="pc-foot"><button id="pcEmergency">Emergency</button><button id="pcCancel">Cancel</button></div>
+        </div>
+      </section>
+
+      <section id="cc"><div id="ccGrid"></div></section>
+
+      <div id="island"><div id="islandInner"></div></div>
+      <header id="status"><span id="stTime"></span><span id="stRight"></span></header>
+      <div id="banners"></div>
+      <div id="hud"></div>
+      <div id="sheetLayer"></div>
+      <section id="assistant">
+        <div class="as-glow"></div>
+        <div id="asLog"></div>
+        <form id="asForm" class="glass"><input id="asInput" placeholder="Ask anything" autocomplete="off"><button id="asMic" type="button" title="Speak">●</button></form>
+      </section>
+      <div id="powerOff"><div class="po-track glass"><div class="po-knob">⏻</div><span>slide to power off</span></div><button id="poCancel">Cancel</button></div>
+      <div id="homeBarZone"><div id="homeBar"></div></div>
+      <div id="dim"></div>
+      <div id="torchLight"></div>
+      <section id="boot"><div id="bootLogo"></div><div id="bootBar"><i></i></div></section>
+    </div>
+  </div>
+  <aside id="help">
+    <b>Glassline OS</b>
+    <p>Swipe up from the bottom bar: home. Swipe up and pause: app switcher. Pull down from the top left: notifications. Pull down from the top right: Control Centre. Swipe down on the home screen: search. Press and hold an icon: edit mode.</p>
+    <p>Keys: <kbd>H</kbd> home · <kbd>L</kbd> lock · <kbd>S</kbd> switcher · <kbd>A</kbd> assistant · <kbd>/</kbd> search · <kbd>C</kbd> Control Centre · <kbd>N</kbd> notifications</p>
+    <p class="fine">An original web shell styled after iOS interaction patterns. Not affiliated with Apple. It cannot run real App Store apps.</p>
+  </aside>
+</div>
+<script src="search-engine.js"></script>
+<script src="core.js"></script>
+<script src="apps.js"></script>
+<script src="store-apps.js"></script>
+<script>GOS.start();</script>
+</body>
+</html>
