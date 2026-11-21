@@ -1,0 +1,944 @@
+<title>Glassline Motion Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a lab bench. The simulated device sits on the left, the instruments that measure it on the right, the evidence ledger underneath. */
+:root {
+  --bg: #eef0f4;
+  --panel: #ffffff;
+  --ink: #161a22;
+  --muted: #5b6475;
+  --line: #d6dae3;
+  --accent: #2f6bff;
+  --good: #1f8a4c; --warn: #a86200; --info: #5a4fcf; --dim: #6b7280;
+  --chip-a: #dff3e7; --chip-b: #fff0d6; --chip-c: #e6e4fb; --chip-d: #eceef2;
+  --f-body: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --f-device: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* device appearance (light) */
+  --wall-a: #ffb38a; --wall-b: #7aa7ff; --wall-c: #c49bff;
+  --glass-tint: #ffffff; --glass-ink: #10131a; --glass-edge: rgba(255,255,255,.55);
+  --app-bg: #f5f6f9; --app-card: #ffffff; --app-ink: #10131a; --app-muted: #6b7280; --app-sep: #e3e6ec;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1218; --panel: #171b23; --ink: #e8ebf2; --muted: #9aa3b5; --line: #2a303c; --accent: #6d97ff;
+  --good: #5fd08e; --warn: #f0b45a; --info: #a99dff; --dim: #9aa3b5;
+  --chip-a: #17331f; --chip-b: #3a2a10; --chip-c: #262249; --chip-d: #232833;
+  --wall-a: #6b2f4f; --wall-b: #1b3a7a; --wall-c: #3b2468;
+  --glass-tint: #1c1f27; --glass-ink: #f3f5f9; --glass-edge: rgba(255,255,255,.18);
+  --app-bg: #0b0c10; --app-card: #1a1c22; --app-ink: #f3f5f9; --app-muted: #9aa3b5; --app-sep: #2a2d36;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1218; --panel: #171b23; --ink: #e8ebf2; --muted: #9aa3b5; --line: #2a303c; --accent: #6d97ff;
+  --good: #5fd08e; --warn: #f0b45a; --info: #a99dff; --dim: #9aa3b5;
+  --chip-a: #17331f; --chip-b: #3a2a10; --chip-c: #262249; --chip-d: #232833;
+  --wall-a: #6b2f4f; --wall-b: #1b3a7a; --wall-c: #3b2468;
+  --glass-tint: #1c1f27; --glass-ink: #f3f5f9; --glass-edge: rgba(255,255,255,.18);
+  --app-bg: #0b0c10; --app-card: #1a1c22; --app-ink: #f3f5f9; --app-muted: #9aa3b5; --app-sep: #2a2d36;
+  color-scheme: dark }
+/* device-only dark switch (from the assistant or control panel) */
+#device.dark {
+  --wall-a: #6b2f4f; --wall-b: #1b3a7a; --wall-c: #3b2468;
+  --glass-tint: #1c1f27; --glass-ink: #f3f5f9; --glass-edge: rgba(255,255,255,.18);
+  --app-bg: #0b0c10; --app-card: #1a1c22; --app-ink: #f3f5f9; --app-muted: #9aa3b5; --app-sep: #2a2d36;
+}
+#device.light {
+  --wall-a: #ffb38a; --wall-b: #7aa7ff; --wall-c: #c49bff;
+  --glass-tint: #ffffff; --glass-ink: #10131a; --glass-edge: rgba(255,255,255,.55);
+  --app-bg: #f5f6f9; --app-card: #ffffff; --app-ink: #10131a; --app-muted: #6b7280; --app-sep: #e3e6ec;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+header h1 { font-size: clamp(26px, 4vw, 38px); line-height: 1.1; margin: 0 0 6px; letter-spacing: -.02em; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 68ch; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.bench { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 860px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.stage { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.stage-note { font-size: 13px; color: var(--muted); max-width: 390px; text-align: center; }
+#deviceHost { position: relative; }
+
+/* ---------- simulated device ---------- */
+#device { position: absolute; left: 0; top: 0; width: 390px; height: 844px; border-radius: 54px; overflow: hidden;
+  transform-origin: 0 0; font-family: var(--f-device); color: var(--glass-ink); user-select: none; -webkit-user-select: none;
+  box-shadow: 0 0 0 10px #1b1d22, 0 0 0 11px #3a3d44, 0 30px 60px rgba(0,0,0,.25); touch-action: none; }
+#wall { position: absolute; inset: 0;
+  background: radial-gradient(120% 80% at 10% 10%, var(--wall-a), transparent 60%),
+              radial-gradient(100% 70% at 90% 30%, var(--wall-c), transparent 60%),
+              radial-gradient(120% 90% at 50% 100%, var(--wall-b), transparent 70%), var(--wall-b); }
+.glass { --g: var(--glass, .35);
+  background: color-mix(in srgb, var(--glass-tint) calc(12% + var(--g) * 78%), transparent);
+  backdrop-filter: blur(calc(4px + var(--g) * 22px)) saturate(170%); -webkit-backdrop-filter: blur(calc(4px + var(--g) * 22px)) saturate(170%);
+  border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-edge), 0 8px 24px rgba(0,0,0,.12); }
+#status { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 34px 0; font-weight: 600; font-size: 16px; z-index: 40; pointer-events: none; color: var(--glass-ink); }
+#status.on-app { color: var(--app-ink); }
+#home { position: absolute; inset: 0; padding: 74px 22px 0; transition: none; }
+.grid { display: grid; grid-template-columns: repeat(4, 64px); justify-content: space-between; row-gap: 26px; }
+.icon { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35); cursor: pointer; }
+.icon .tile { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; font-weight: 700; font-size: 26px; color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.35); }
+.icon:focus-visible .tile { outline: 3px solid #fff; outline-offset: 2px; }
+#dock { position: absolute; left: 12px; right: 12px; bottom: 14px; height: 96px; border-radius: 38px; display: flex; justify-content: space-around; align-items: center; padding: 0 14px; }
+#dock .icon span { display: none; }
+
+#island { position: absolute; top: 11px; left: 50%; width: 126px; height: 37px; margin-left: -63px; border-radius: 19px; background: #000; z-index: 60; overflow: hidden; color: #fff; cursor: pointer; touch-action: none; }
+#island .glow { position: absolute; inset: -40%; opacity: 0; background: conic-gradient(from 0deg, #ff7a59, #ffcf5a, #5affb0, #59b8ff, #b169ff, #ff5ab4, #ff7a59); filter: blur(18px); animation: spin 2.4s linear infinite; }
+#island .mask { position: absolute; inset: 3px; border-radius: inherit; background: #000; }
+#island .ask { position: absolute; inset: 0; padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 10px; opacity: 0; pointer-events: none; }
+#island.asking .ask { pointer-events: auto; }
+#island .ask label { font-size: 12px; color: #b9bfcc; letter-spacing: .02em; }
+#island .ask input { width: 100%; background: #16181d; color: #fff; border: 1px solid #2c3038; border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 15px; }
+#island .ask input:focus { outline: 2px solid #59b8ff; }
+#island .answer { font-size: 13px; line-height: 1.4; color: #e6e8ee; min-height: 36px; overflow-wrap: anywhere; }
+#island .answer b { color: #8fd0ff; font-weight: 600; }
+#island .live { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; font-size: 13px; opacity: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#topStrip { position: absolute; top: 0; left: 0; right: 0; height: 48px; z-index: 50; touch-action: none; }
+#bottomStrip { position: absolute; left: 0; right: 0; bottom: 0; height: 34px; z-index: 55; touch-action: none; display: none; }
+#bottomStrip.on { display: block; }
+#indicator { position: absolute; bottom: 8px; left: 50%; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: var(--app-ink); opacity: .85; pointer-events: none; z-index: 56; display: none; }
+#indicator.on { display: block; }
+
+/* app window */
+#appWin { position: absolute; overflow: hidden; z-index: 30; display: none; background: var(--app-bg); box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+#appWin .content { position: absolute; left: 0; top: 0; width: 390px; height: 844px; transform-origin: 0 0; color: var(--app-ink); }
+#appWin .splash { position: absolute; inset: 0; display: grid; place-items: center; font-size: 60px; font-weight: 700; color: #fff; pointer-events: none; }
+.page { position: absolute; inset: 0; background: var(--app-bg); overflow: hidden; }
+.scroller { position: absolute; inset: 0; overflow-y: auto; touch-action: pan-y; padding: 100px 0 120px; scrollbar-width: none; }
+.scroller::-webkit-scrollbar { display: none; }
+.navbar { position: absolute; top: 0; left: 0; right: 0; height: 96px; z-index: 5; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; pointer-events: none; }
+.navbar .bg { position: absolute; inset: 0; opacity: 0; border: 0; border-bottom: 1px solid var(--glass-edge); box-shadow: none; }
+.navbar .small { position: relative; font-weight: 600; font-size: 17px; opacity: 0; }
+.navbar .back { position: absolute; left: 12px; bottom: 8px; pointer-events: auto; background: none; border: 0; font: inherit; font-size: 17px; color: var(--accent); cursor: pointer; padding: 4px 6px; }
+.largeTitle { font-size: 34px; font-weight: 700; padding: 0 20px 8px; transform-origin: 20px 50%; letter-spacing: -.01em; }
+.section { margin: 8px 16px 18px; background: var(--app-card); border-radius: 18px; overflow: hidden; }
+.row { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--app-sep); cursor: pointer; }
+.row:last-child { border-bottom: 0; }
+.row .dot { width: 30px; height: 30px; border-radius: 8px; flex: none; }
+.row .txt { flex: 1; min-width: 0; }
+.row .t1 { font-size: 16px; }
+.row .t2 { font-size: 13px; color: var(--app-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .chev { color: var(--app-muted); }
+.detail-body { padding: 0 20px; font-size: 17px; line-height: 1.55; }
+.dim { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 2; }
+#tabbar { position: absolute; left: 50%; bottom: 26px; height: 62px; width: 300px; margin-left: -150px; border-radius: 31px; z-index: 8; display: flex; align-items: center; justify-content: space-around; padding: 0 10px; font-size: 11px; transform-origin: 50% 100%; }
+#tabbar .tab { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--app-muted); }
+#tabbar .tab.on { color: var(--accent); }
+#tabbar .tab i { width: 22px; height: 22px; border-radius: 7px; background: currentColor; opacity: .85; display: block; }
+.setting { padding: 14px 16px; border-bottom: 1px solid var(--app-sep); display: flex; flex-direction: column; gap: 8px; }
+.setting:last-child { border-bottom: 0; }
+.setting .lab { display: flex; justify-content: space-between; font-size: 15px; }
+.setting .lab span:last-child { color: var(--app-muted); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+/* switcher */
+#switcher { position: absolute; inset: 0; z-index: 35; display: none; background: rgba(0,0,0,.25); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+#switcher .rail { position: absolute; inset: 0; display: flex; align-items: center; gap: 18px; overflow-x: auto; padding: 0 64px; scroll-snap-type: x mandatory; touch-action: pan-x; scrollbar-width: none; }
+.card { flex: none; width: 242px; height: 523px; border-radius: 34px; overflow: hidden; position: relative; scroll-snap-align: center; background: var(--app-bg); color: var(--app-ink); box-shadow: 0 20px 40px rgba(0,0,0,.35); cursor: pointer; touch-action: none; }
+.card .cap { position: absolute; top: -28px; left: 6px; color: #fff; font-size: 13px; font-weight: 600; }
+.card .hd { height: 90px; display: flex; align-items: flex-end; padding: 0 16px 12px; font-weight: 700; font-size: 22px; }
+.card .ln { height: 12px; margin: 14px 16px; border-radius: 6px; background: var(--app-sep); }
+.switch-empty { position: absolute; bottom: 60px; left: 0; right: 0; text-align: center; color: #fff; font-size: 13px; opacity: .8; }
+
+/* control panel */
+#panel { position: absolute; left: 0; top: 0; width: 390px; height: 844px; z-index: 45; transform: translateY(-860px); padding: 64px 18px 24px; border-radius: 0 0 40px 40px; border-width: 0 0 1px; display: flex; flex-direction: column; gap: 14px; touch-action: none; }
+#panel h3 { margin: 4px 4px 0; font-size: 14px; font-weight: 600; opacity: .75; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.tilebtn { aspect-ratio: 1; border-radius: 22px; border: 0; font: inherit; font-size: 11px; font-weight: 600; color: var(--glass-ink); cursor: pointer; display: grid; place-items: center; padding: 4px; text-align: center; }
+.tilebtn.on { background: var(--accent); color: #fff; }
+.tilebtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.pcard { border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.pcard .lab { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; }
+.pcard .lab span:last-child { font-weight: 500; opacity: .7; font-variant-numeric: tabular-nums; }
+.notif { border-radius: 20px; padding: 10px 14px; font-size: 13px; display: grid; grid-template-columns: 30px 1fr; gap: 2px 10px; }
+.notif .ic { grid-row: span 2; width: 30px; height: 30px; border-radius: 8px; }
+.notif b { font-size: 13px; }
+.notifs { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: none; }
+.sumbtn { align-self: flex-start; border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--glass-ink); }
+.summary { font-size: 13px; line-height: 1.45; border-radius: 20px; padding: 12px 14px; }
+.summary[hidden] { display: none !important; }
+.handle { width: 40px; height: 5px; border-radius: 3px; background: var(--glass-ink); opacity: .4; align-self: center; margin-top: auto; flex: none; }
+
+/* ---------- instruments ---------- */
+.instruments { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; min-width: 0; }
+.box h2 { font-size: 15px; margin: 0 0 10px; letter-spacing: -.005em; }
+.box p.sub { margin: -4px 0 12px; font-size: 13px; color: var(--muted); }
+.read { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 16px; }
+.read div { display: flex; flex-direction: column; min-width: 0; }
+.read small { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.read output { font-family: var(--f-mono); font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#curve { width: 100%; height: 170px; display: block; }
+.ctl { display: grid; grid-template-columns: 150px minmax(0, 1fr) 60px; gap: 10px; align-items: center; font-size: 13px; }
+.ctl output { font-family: var(--f-mono); text-align: right; }
+@media (max-width: 480px) { .ctl { grid-template-columns: minmax(0,1fr) 54px; } .ctl label { grid-column: 1 / -1; } }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+button.b { font: inherit; font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+button.b:hover { border-color: var(--accent); }
+button.b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#log { font-family: var(--f-mono); font-size: 12px; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; max-height: 190px; overflow-y: auto; }
+#log li { color: var(--muted); overflow-wrap: anywhere; }
+#log li b { color: var(--ink); font-weight: 600; }
+.try { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.try b { color: var(--ink); font-weight: 600; }
+#csv { width: 100%; height: 70px; font-family: var(--f-mono); font-size: 11px; margin-top: 8px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+#csv[hidden] { display: none !important; }
+
+/* ---------- evidence ledger ---------- */
+.ledger h2 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
+.ledger > p { margin: 0 0 14px; color: var(--muted); max-width: 72ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 14px; font-size: 13px; color: var(--muted); }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td a { color: var(--accent); overflow-wrap: anywhere; }
+.chip { display: inline-block; font-family: var(--f-mono); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.A { background: var(--chip-a); color: var(--good); }
+.chip.B { background: var(--chip-b); color: var(--warn); }
+.chip.C { background: var(--chip-c); color: var(--info); }
+.chip.D { background: var(--chip-d); color: var(--dim); }
+code { font-family: var(--f-mono); font-size: .92em; }
+@media (prefers-reduced-motion: reduce) { #island .glow { animation: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Behavioural reverse engineering · iOS 27 cycle</div>
+    <h1>Glassline Motion Lab</h1>
+    <p>An original, working recreation of the interaction patterns documented or reported for iOS 27: adjustable glass material, spring-driven app launch and dismissal, velocity-projected gestures, interactive back navigation, a collapsing toolbar, an assistant that lives in the top pill, and notification summaries. Every animation is instrumented, so you can export its curve and check it against a screen recording from a real device.</p>
+  </header>
+
+  <section class="bench">
+    <div class="stage">
+      <div id="deviceHost">
+        <div id="device" data-entity="screen">
+          <div id="wall"></div>
+          <div id="status"><span id="clock">9:41</span><span>▮▮▮ ◔</span></div>
+          <div id="island" role="button" tabindex="0" aria-label="Assistant. Drag down or press and hold to ask.">
+            <div class="glow"></div><div class="mask"></div>
+            <div class="live"><span>● Timer</span><span id="liveTime">04:59</span></div>
+            <div class="ask">
+              <label for="askInput">Ask about this screen or give a command</label>
+              <input id="askInput" autocomplete="off" placeholder="Try “open notes” or “what’s on screen”">
+              <div class="answer" id="answer"></div>
+            </div>
+          </div>
+          <div id="topStrip" aria-hidden="true"></div>
+
+          <div id="home">
+            <div class="grid" id="grid"></div>
+            <div id="dock" class="glass"></div>
+          </div>
+
+          <div id="appWin"><div class="content" id="appContent"></div><div class="splash" id="splash"></div></div>
+          <div id="switcher"><div class="rail" id="rail"></div><div class="switch-empty">Swipe a card up to close it · tap outside to go home</div></div>
+
+          <div id="panel" class="glass">
+            <div class="tiles">
+              <button class="tilebtn glass on" data-tile="wifi">Wi-Fi</button>
+              <button class="tilebtn glass on" data-tile="bt">Bluetooth</button>
+              <button class="tilebtn glass" data-tile="focus">Focus</button>
+              <button class="tilebtn glass" data-tile="dark" id="darkTile">Dark</button>
+            </div>
+            <div class="pcard glass">
+              <div class="lab"><span>Glass material</span><span id="glassReadP">35%</span></div>
+              <input type="range" id="glassP" min="0" max="100" value="35" aria-label="Glass material from clear to tinted">
+              <div class="lab" style="font-weight:500;font-size:12px;opacity:.7"><span>Clear</span><span>Tinted</span></div>
+            </div>
+            <h3>Notifications</h3>
+            <div class="notifs" id="notifs"></div>
+            <button class="sumbtn glass" id="sumBtn">Summarize</button>
+            <div class="summary glass" id="summary" hidden></div>
+            <div class="handle"></div>
+          </div>
+
+          <div id="bottomStrip" aria-hidden="true"></div>
+          <div id="indicator"></div>
+        </div>
+      </div>
+      <div class="stage-note">Use mouse or touch. Swipe up from the bar at the bottom of an open app. Pull down from the top edge. Drag down on the black pill to ask.</div>
+    </div>
+
+    <div class="instruments">
+      <div class="box">
+        <h2>Last gesture</h2>
+        <p class="sub">How the release was decided: finger velocity, where that velocity projects to, and the outcome.</p>
+        <div class="read">
+          <div><small>Gesture</small><output id="rGesture">none yet</output></div>
+          <div><small>Velocity</small><output id="rVel">–</output></div>
+          <div><small>Projected</small><output id="rProj">–</output></div>
+          <div><small>Decision</small><output id="rDecision">–</output></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>Last animation curve</h2>
+        <p class="sub">Progress against time, sampled every frame. The dashed line marks the target.</p>
+        <canvas id="curve" width="720" height="340"></canvas>
+        <div class="read" style="margin-top:10px">
+          <div><small>Spring</small><output id="rSpring">–</output></div>
+          <div><small>Overshoot</small><output id="rOver">–</output></div>
+          <div><small>Settled in</small><output id="rSettle">–</output></div>
+          <div><small>Samples</small><output id="rSamples">–</output></div>
+        </div>
+        <div class="btns">
+          <button class="b" id="copyCsv">Copy curve as CSV</button>
+          <button class="b" id="replay">Replay launch</button>
+        </div>
+        <textarea id="csv" hidden readonly aria-label="Curve CSV"></textarea>
+      </div>
+
+      <div class="box">
+        <h2>Tuning</h2>
+        <p class="sub">The same parameters as SwiftUI’s <code>.spring(response:dampingFraction:)</code>. Paste values fitted from a device recording here to compare.</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="ctl"><label for="tResp">Launch response (s)</label><input type="range" id="tResp" min="0.15" max="1.2" step="0.01" value="0.5"><output id="oResp">0.50</output></div>
+          <div class="ctl"><label for="tDamp">Launch damping</label><input type="range" id="tDamp" min="0.3" max="1.2" step="0.01" value="0.86"><output id="oDamp">0.86</output></div>
+          <div class="ctl"><label for="tSlow">Slow motion</label><input type="range" id="tSlow" min="1" max="10" step="1" value="1"><output id="oSlow">1×</output></div>
+          <div class="ctl"><label for="tReduce">Reduce motion</label><input type="checkbox" id="tReduce" style="justify-self:start"><output></output></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>Event log</h2>
+        <ul id="log"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="ledger">
+    <div class="eyebrow">Evidence ledger</div>
+    <h2>What is known, and how sure we are</h2>
+    <p>Each behaviour is graded by its source. Nothing here was observed on an iOS 27 device. No device or simulator was available, so the last column says how to confirm each item on one.</p>
+    <div class="legend">
+      <span><span class="chip A">A</span> Apple developer documentation, fetched and quoted</span>
+      <span><span class="chip B">B</span> Reported in search results; source page could not be fetched</span>
+      <span><span class="chip C">C</span> Public Apple API or session from earlier releases</span>
+      <span><span class="chip D">D</span> Community reverse engineering, or our own design choice</span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Behaviour</th><th>Grade</th><th>Evidence</th><th>How this lab recreates it</th><th>Verify on a device</th></tr></thead>
+        <tbody id="ledgerBody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+"use strict";
+const W = 390, H = 844, R = 54;
+const $ = (s, el = document) => el.querySelector(s);
+const device = $("#device"), host = $("#deviceHost");
+const reduceMQ = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+/* ---------------- scale the device to the viewport ---------------- */
+let S = 1;
+function fit() {
+  const avail = Math.min(W, document.documentElement.clientWidth - 32);
+  S = Math.min(1, avail / W);
+  device.style.transform = `scale(${S})`;
+  host.style.width = W * S + "px"; host.style.height = H * S + "px";
+}
+addEventListener("resize", fit); fit();
+function local(e) { const r = device.getBoundingClientRect(); return { x: (e.clientX - r.left) / S, y: (e.clientY - r.top) / S }; }
+
+/* ---------------- physics ---------------- */
+// Unit-mass damped spring, the parameterisation SwiftUI uses for .spring(response:dampingFraction:)
+const Spring = {
+  coeffs(response, damping) { const w = 2 * Math.PI / response; return { k: w * w, c: 2 * damping * w }; },
+};
+const DECEL_NORMAL = 0.998; // UIScrollView.DecelerationRate.normal
+function project(v, rate = DECEL_NORMAL) { return (v / 1000) * rate / (1 - rate); } // v in px/s → px
+function rubber(x, dim, c = 0.55) { const s = Math.sign(x), a = Math.abs(x); return s * (1 - 1 / (a * c / dim + 1)) * dim; }
+const slow = () => +$("#tSlow").value;
+const reduced = () => reduceMQ.matches || $("#tReduce").checked;
+
+const anims = new Map();
+let lastCurve = null;
+/** Animate one scalar with a spring. Retargeting an in-flight key keeps its velocity. */
+function spring(key, from, to, { response = 0.5, damping = 0.86, velocity = 0, record = false, label = key } = {}, onUpdate) {
+  const prev = anims.get(key);
+  if (prev) { prev.cancelled = true; from = prev.x; velocity = prev.v; }
+  return new Promise(resolve => {
+    const st = { x: from, v: velocity, cancelled: false };
+    anims.set(key, st);
+    const { k, c } = Spring.coeffs(response, damping);
+    const samples = record ? [] : null;
+    let t0 = null, last = null, simT = 0;
+    const span = to - from || 1;
+    function frame(now) {
+      if (st.cancelled) return resolve(false);
+      if (t0 === null) { t0 = last = now; }
+      let dt = Math.min(0.064, (now - last) / 1000) / slow(); last = now;
+      const steps = Math.max(1, Math.ceil(dt / 0.001)), h = dt / steps;
+      for (let i = 0; i < steps; i++) { const a = -k * (st.x - to) - c * st.v; st.v += a * h; st.x += st.v * h; }
+      simT += dt;
+      if (samples) samples.push([simT, (st.x - from) / span]);
+      const done = Math.abs(st.x - to) < 0.0005 * Math.max(1, Math.abs(span)) && Math.abs(st.v) < 0.01 * Math.max(1, Math.abs(span));
+      if (done) { st.x = to; st.v = 0; }
+      onUpdate(st.x);
+      if (done) {
+        anims.delete(key);
+        if (samples) { lastCurve = { label, response, damping, samples }; drawCurve(); }
+        return resolve(true);
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  });
+}
+window.__lab = { Spring, project, rubber, get lastCurve() { return lastCurve; }, state: null };
+
+/* ---------------- velocity tracking ---------------- */
+function tracker() {
+  const pts = [];
+  return {
+    add(p) { const t = performance.now(); pts.push({ ...p, t }); while (pts.length > 2 && t - pts[0].t > 100) pts.shift(); },
+    velocity() {
+      if (pts.length < 2) return { x: 0, y: 0 };
+      const a = pts[0], b = pts[pts.length - 1], dt = (b.t - a.t) / 1000 || 1e-3;
+      if (performance.now() - b.t > 80) return { x: 0, y: 0 }; // finger rested before lifting
+      return { x: (b.x - a.x) / dt, y: (b.y - a.y) / dt };
+    },
+  };
+}
+
+/* ---------------- logging & readouts ---------------- */
+function log(name, detail = "") {
+  const li = document.createElement("li");
+  li.innerHTML = `<b>${name}</b> ${detail}`;
+  const ul = $("#log"); ul.prepend(li); while (ul.children.length > 30) ul.lastChild.remove();
+}
+function readout(g, v, p, d) { $("#rGesture").value = g; $("#rVel").value = v; $("#rProj").value = p; $("#rDecision").value = d; }
+
+function drawCurve() {
+  const cv = $("#curve"), ctx = cv.getContext("2d"), cs = getComputedStyle(document.documentElement);
+  const ink = cs.getPropertyValue("--ink").trim(), muted = cs.getPropertyValue("--muted").trim(), line = cs.getPropertyValue("--line").trim(), acc = cs.getPropertyValue("--accent").trim();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const L = 60, Rm = 20, T = 20, B = 44, pw = cv.width - L - Rm, ph = cv.height - T - B;
+  ctx.font = "20px JetBrains Mono, monospace"; ctx.fillStyle = muted; ctx.strokeStyle = line; ctx.lineWidth = 1;
+  if (!lastCurve) { ctx.fillText("Open an app to record a curve", L, T + ph / 2); return; }
+  const s = lastCurve.samples, tMax = Math.max(0.2, s[s.length - 1][0]);
+  let yMax = 1.2, yMin = 0;
+  for (const [, y] of s) { yMax = Math.max(yMax, y + 0.05); yMin = Math.min(yMin, y - 0.05); }
+  const X = t => L + t / tMax * pw, Y = y => T + (yMax - y) / (yMax - yMin) * ph;
+  for (const y of [0, 0.5, 1]) { ctx.beginPath(); ctx.moveTo(L, Y(y)); ctx.lineTo(L + pw, Y(y)); ctx.stroke(); ctx.fillText(y.toFixed(1), 8, Y(y) + 6); }
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++) { const t = tMax * i / ticks; ctx.fillText(t.toFixed(2) + "s", X(t) - 24, cv.height - 12); }
+  ctx.setLineDash([6, 6]); ctx.strokeStyle = muted; ctx.beginPath(); ctx.moveTo(L, Y(1)); ctx.lineTo(L + pw, Y(1)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = acc; ctx.lineWidth = 3; ctx.beginPath();
+  s.forEach(([t, y], i) => i ? ctx.lineTo(X(t), Y(y)) : ctx.moveTo(X(t), Y(y))); ctx.stroke();
+  const peak = s.reduce((m, p) => p[1] > m[1] ? p : m, s[0]);
+  if (peak[1] > 1.001) { ctx.fillStyle = acc; ctx.beginPath(); ctx.arc(X(peak[0]), Y(peak[1]), 6, 0, 7); ctx.fill(); }
+  const settle = (() => { for (let i = s.length - 1; i >= 0; i--) if (Math.abs(s[i][1] - 1) > 0.01) return s[Math.min(i + 1, s.length - 1)][0]; return 0; })();
+  $("#rSpring").value = `${lastCurve.response.toFixed(2)}s / ζ ${lastCurve.damping.toFixed(2)}`;
+  $("#rOver").value = Math.max(0, (peak[1] - 1) * 100).toFixed(1) + "%";
+  $("#rSettle").value = settle.toFixed(3) + "s (1%)";
+  $("#rSamples").value = `${s.length} · ${lastCurve.label}`;
+  ctx.fillStyle = ink;
+}
+
+/* ---------------- content ---------------- */
+const APPS = [
+  { id: "notes", name: "Notes", c: ["#ffd25a", "#f5a623"], g: "N" },
+  { id: "gallery", name: "Gallery", c: ["#ff8a65", "#e0457b"], g: "G" },
+  { id: "weather", name: "Weather", c: ["#5ac8fa", "#2f6bff"], g: "W" },
+  { id: "settings", name: "Settings", c: ["#9aa3b5", "#5b6475"], g: "S" },
+  { id: "messages", name: "Messages", c: ["#5ee38a", "#20b05a"], g: "M" },
+  { id: "music", name: "Music", c: ["#ff6b8a", "#d6245a"], g: "♪" },
+  { id: "maps", name: "Maps", c: ["#8be38f", "#3aa0ff"], g: "⌖" },
+  { id: "clock", name: "Clock", c: ["#3a3d44", "#111318"], g: "◷" },
+  { id: "calendar", name: "Calendar", c: ["#ffffff", "#e6e8ee"], g: "21", dark: true },
+  { id: "files", name: "Files", c: ["#7ab8ff", "#2f6bff"], g: "F" },
+  { id: "health", name: "Health", c: ["#ff9fb5", "#ff5a7a"], g: "♥" },
+  { id: "books", name: "Books", c: ["#ffb35a", "#ff7a1a"], g: "B" },
+];
+const DOCK = ["messages", "gallery", "music", "settings"];
+const ITEMS = {
+  notes: [["Trip checklist", "Passport, chargers, the blue jacket"], ["Spring curves", "response 0.5, damping 0.86 feels right"], ["Groceries", "Oats, lemons, coffee beans"], ["Ideas", "A clock that shows tides"], ["Reading list", "Three essays on interface motion"], ["Workout", "Intervals, 6 × 400 m"], ["Recipes", "Miso soup, quick version"], ["Gift ideas", "Fountain pen, plant stand"], ["Meeting notes", "Ship the beta on Thursday"], ["Packing", "Tent, stove, headlamp"], ["Quotes", "Make it simple, but significant"], ["Wishlist", "Bike lights"]],
+  default: [["Today", "3 updates"], ["Yesterday", "1 update"], ["This week", "12 items"], ["Pinned", "4 items"], ["Shared with you", "2 items"], ["Archive", "128 items"], ["Recently deleted", "Kept for 30 days"], ["Favourites", "9 items"], ["Downloads", "Empty"], ["Drafts", "2 items"], ["Tags", "6 tags"], ["Help", "Tips and shortcuts"]],
+};
+const NOTIFS = [
+  { app: "messages", who: "Mia", text: "Dinner moved to 8 pm, same place." },
+  { app: "messages", who: "Mia", text: "Can you bring the speaker?" },
+  { app: "calendar", who: "Calendar", text: "Design review in 15 minutes, Room 4." },
+  { app: "weather", who: "Weather", text: "Rain starting around 6 pm. 80% chance." },
+  { app: "messages", who: "Dev", text: "Build 27.2 passed all tests." },
+  { app: "files", who: "Files", text: "“Motion study.mov” finished uploading (1.2 GB)." },
+];
+const appById = id => APPS.find(a => a.id === id);
+const grad = a => `linear-gradient(160deg, ${a.c[0]}, ${a.c[1]})`;
+
+function iconEl(a) {
+  const d = document.createElement("div");
+  d.className = "icon"; d.dataset.app = a.id; d.tabIndex = 0; d.setAttribute("role", "button");
+  d.setAttribute("aria-label", `Open ${a.name}`); d.dataset.entity = `app:${a.name}`;
+  d.innerHTML = `<div class="tile" style="background:${grad(a)};${a.dark ? "color:#e0457b" : ""}">${a.g}</div><span>${a.name}</span>`;
+  d.addEventListener("click", () => openApp(a.id, d.querySelector(".tile")));
+  d.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openApp(a.id, d.querySelector(".tile")); } });
+  return d;
+}
+APPS.filter(a => !DOCK.includes(a.id)).forEach(a => $("#grid").append(iconEl(a)));
+DOCK.forEach(id => $("#dock").append(iconEl(appById(id))));
+NOTIFS.forEach(n => {
+  const a = appById(n.app), d = document.createElement("div");
+  d.className = "notif glass"; d.dataset.entity = `notification:${n.who}`;
+  d.innerHTML = `<div class="ic" style="background:${grad(a)}"></div><b>${n.who}</b><span>${n.text}</span>`;
+  $("#notifs").append(d);
+});
+
+/* ---------------- glass material ---------------- */
+function setGlass(pct, src = "slider") {
+  pct = Math.max(0, Math.min(100, Math.round(pct)));
+  device.style.setProperty("--glass", pct / 100);
+  $("#glassP").value = pct; $("#glassReadP").textContent = pct + "%";
+  const s = $("#glassS"); if (s) { s.value = pct; $("#glassReadS").textContent = pct + "%"; }
+  return pct;
+}
+$("#glassP").addEventListener("input", e => setGlass(+e.target.value));
+setGlass(35);
+
+/* ---------------- app window ---------------- */
+const win = $("#appWin"), content = $("#appContent"), splash = $("#splash");
+const state = { app: null, opened: [], depth: 0, mode: "home" };
+window.__lab.state = state;
+const FULL = { x: 0, y: 0, w: W, h: H, r: R };
+function rectOf(el) {
+  const d = device.getBoundingClientRect(), r = el.getBoundingClientRect();
+  return { x: (r.left - d.left) / S, y: (r.top - d.top) / S, w: r.width / S, h: r.height / S, r: 16 };
+}
+function lerpRect(a, b, p) { return { x: a.x + (b.x - a.x) * p, y: a.y + (b.y - a.y) * p, w: a.w + (b.w - a.w) * p, h: a.h + (b.h - a.h) * p, r: a.r + (b.r - a.r) * p }; }
+let curRect = FULL;
+function applyRect(r) {
+  curRect = r;
+  Object.assign(win.style, { left: r.x + "px", top: r.y + "px", width: Math.max(1, r.w) + "px", height: Math.max(1, r.h) + "px", borderRadius: Math.max(0, r.r) + "px" });
+  content.style.transform = `scale(${r.w / W})`;
+  const p = Math.max(0, Math.min(1, (r.w - 64) / (W - 64)));
+  splash.style.opacity = Math.max(0, 1 - p * 2.2);
+  $("#home").style.transform = `scale(${1 + 0.12 * p})`; // home zooms past the viewer as the app grows
+  $("#home").style.opacity = 1 - 0.6 * p;
+}
+
+function buildApp(id) {
+  const a = appById(id);
+  splash.style.background = grad(a); splash.textContent = a.g;
+  const items = ITEMS[id] || ITEMS.default;
+  const rows = items.map(([t1, t2], i) => `<div class="row" data-i="${i}" data-entity="item:${t1}"><div class="dot" style="background:${grad(APPS[(i + 2) % APPS.length])}"></div><div class="txt"><div class="t1">${t1}</div><div class="t2">${t2}</div></div><span class="chev">›</span></div>`).join("");
+  const settingsBlock = id === "settings" ? `
+    <div class="section">
+      <div class="setting"><div class="lab"><span>Glass material</span><span id="glassReadS">35%</span></div>
+        <input type="range" id="glassS" min="0" max="100" aria-label="Glass material from clear to tinted">
+        <div class="lab" style="font-size:12px"><span>Clear</span><span>Tinted</span></div></div>
+      <div class="setting"><div class="lab"><span>Appearance</span><span id="apprLab">Follow page</span></div>
+        <div style="display:flex;gap:8px"><button class="b" data-appr="light">Light</button><button class="b" data-appr="dark">Dark</button><button class="b" data-appr="">Auto</button></div></div>
+    </div>` : "";
+  content.innerHTML = `
+    <div class="page" id="pList">
+      <div class="navbar"><div class="bg glass"></div><div class="small">${a.name}</div></div>
+      <div class="scroller" id="scList">
+        <div class="largeTitle" id="lt">${a.name}</div>
+        ${settingsBlock}
+        <div class="section">${rows}</div>
+      </div>
+      <div class="dim" id="dimList"></div>
+    </div>
+    <div class="page" id="pDetail" style="transform:translateX(${W}px)">
+      <div class="navbar"><div class="bg glass" style="opacity:1"></div><button class="back" id="backBtn">‹ ${a.name}</button><div class="small" id="dTitleSmall" style="opacity:1"></div></div>
+      <div class="scroller"><div class="largeTitle" id="dTitle"></div><div class="detail-body" id="dBody"></div></div>
+    </div>
+    <div id="tabbar" class="glass">
+      <div class="tab on"><i></i>Browse</div><div class="tab"><i></i>Recent</div><div class="tab"><i></i>Shared</div><div class="tab"><i></i>Search</div>
+    </div>`;
+  state.depth = 0;
+  const sc = $("#scList"), lt = $("#lt"), small = $("#pList .navbar .small"), bg = $("#pList .navbar .bg");
+  let lastY = 0, minimized = false;
+  sc.addEventListener("scroll", () => {
+    const y = sc.scrollTop, p = Math.max(0, Math.min(1, y / 52));
+    lt.style.opacity = 1 - p; lt.style.transform = `scale(${1 - 0.15 * p})`;
+    small.style.opacity = p; bg.style.opacity = p;
+    // toolbarMinimizeBehavior analogue: collapse while scrolling down, restore on scroll up
+    const down = y > lastY + 2, up = y < lastY - 2;
+    if (down && y > 80 && !minimized) { minimized = true; minimizeTabbar(true); }
+    else if ((up || y < 40) && minimized) { minimized = false; minimizeTabbar(false); }
+    lastY = y;
+  }, { passive: true });
+  content.querySelectorAll("#pList .row").forEach(r => r.addEventListener("click", () => push(items[+r.dataset.i])));
+  $("#backBtn").addEventListener("click", () => pop(0));
+  if (id === "settings") {
+    $("#glassS").addEventListener("input", e => setGlass(+e.target.value));
+    setGlass(+$("#glassP").value);
+    content.querySelectorAll("[data-appr]").forEach(b => b.addEventListener("click", () => setAppearance(b.dataset.appr)));
+  }
+}
+function minimizeTabbar(on) {
+  const tb = $("#tabbar");
+  spring("tab", on ? 0 : 1, on ? 1 : 0, { response: 0.42, damping: 0.8 }, p => {
+    tb.style.width = (300 - 170 * p) + "px"; tb.style.marginLeft = -(300 - 170 * p) / 2 + "px";
+    tb.style.transform = `translateY(${8 * p}px) scale(${1 - 0.1 * p})`;
+    tb.querySelectorAll(".tab").forEach((t, i) => { t.style.display = (p > 0.5 && i > 0) ? "none" : ""; });
+  });
+  log("toolbar", on ? "minimized on scroll down" : "restored");
+}
+
+async function openApp(id, fromEl, { fromRect } = {}) {
+  if (state.mode === "opening") return;
+  closeAssistant();
+  const a = appById(id);
+  if (state.app !== id) buildApp(id);
+  state.app = id; state.mode = "opening";
+  if (!state.opened.includes(id)) state.opened.unshift(id); else { state.opened.splice(state.opened.indexOf(id), 1); state.opened.unshift(id); }
+  $("#switcher").style.display = "none";
+  win.style.display = "block";
+  const start = fromRect || (fromEl ? rectOf(fromEl) : { x: W / 2 - 32, y: H / 2 - 32, w: 64, h: 64, r: 16 });
+  const resp = +$("#tResp").value, damp = +$("#tDamp").value;
+  log("launch", `${a.name} · spring ${resp.toFixed(2)}s ζ${damp.toFixed(2)}${reduced() ? " · reduce motion → cross-fade" : ""}`);
+  if (reduced()) {
+    applyRect(FULL);
+    await spring("win", 0, 1, { response: 0.3, damping: 1, record: true, label: "fade" }, p => { win.style.opacity = p; });
+  } else {
+    win.style.opacity = 1;
+    await spring("win", 0, 1, { response: resp, damping: damp, record: true, label: "launch" }, p => applyRect(lerpRect(start, FULL, p)));
+  }
+  state.mode = "app";
+  $("#status").classList.add("on-app");
+  $("#bottomStrip").classList.add("on"); $("#indicator").classList.add("on");
+}
+
+async function goHome(velocity = 0) {
+  const icon = document.querySelector(`.icon[data-app="${state.app}"] .tile`);
+  const target = icon ? rectOf(icon) : { x: W / 2 - 32, y: H / 2 - 32, w: 64, h: 64, r: 16 };
+  // icon rect measured while home is scaled; correct for current home transform
+  $("#home").style.transform = ""; const t2 = icon ? rectOf(icon) : target; applyRect(curRect);
+  const from = curRect; state.mode = "closing";
+  $("#status").classList.remove("on-app"); $("#bottomStrip").classList.remove("on"); $("#indicator").classList.remove("on");
+  if (reduced()) {
+    await spring("win", 1, 0, { response: 0.3, damping: 1, record: true, label: "fade" }, p => { win.style.opacity = p; $("#home").style.opacity = 1 - 0.6 * p; });
+  } else {
+    await spring("win", 0, 1, { response: 0.45, damping: 0.9, velocity, record: true, label: "dismiss" }, p => applyRect(lerpRect(from, t2, p)));
+  }
+  win.style.display = "none"; win.style.opacity = 1; $("#home").style.transform = ""; $("#home").style.opacity = 1;
+  state.mode = "home"; log("home", velocity ? `handed off velocity ${velocity.toFixed(2)}/s` : "");
+}
+
+/* ---------------- home gesture ---------------- */
+(() => {
+  const strip = $("#bottomStrip"); let start, tr, active = false;
+  strip.addEventListener("pointerdown", e => {
+    if (state.mode !== "app") return;
+    strip.setPointerCapture(e.pointerId); active = true; start = local(e); tr = tracker(); tr.add(start);
+    log("home gesture", "began");
+  });
+  strip.addEventListener("pointermove", e => {
+    if (!active) return; const p = local(e); tr.add(p);
+    const dy = Math.min(0, p.y - start.y), dx = p.x - start.x;
+    const g = Math.min(1, -dy / (H * 0.6));
+    const scale = 1 - 0.55 * g, w = W * scale, h = H * scale;
+    const bottom = H + dy * 0.85;
+    applyRect({ x: W / 2 - w / 2 + dx * 0.6, y: bottom - h, w, h, r: R });
+  });
+  const end = e => {
+    if (!active) return; active = false;
+    const p = local(e), v = tr.velocity(), dy = Math.min(0, p.y - start.y);
+    const proj = dy + project(v.y);
+    let decision;
+    // A finger that rests before lifting asks for the switcher; otherwise the projected end point decides.
+    if (Math.abs(v.y) < 300 && -dy > 110) decision = "switcher";
+    else if (-proj > H * 0.3) decision = "home";
+    else decision = "cancel";
+    readout("home swipe", `${v.y.toFixed(0)} px/s`, `${proj.toFixed(0)} px`, decision);
+    log("home gesture", `ended · v=${v.y.toFixed(0)}px/s · projected ${proj.toFixed(0)}px → ${decision}`);
+    if (decision === "home") {
+      const dist = Math.hypot(curRect.y - 0, curRect.w - 64) || 1;
+      goHome(Math.min(8, Math.abs(v.y) / Math.max(200, dist)));
+    } else if (decision === "switcher") showSwitcher();
+    else { state.mode = "opening"; spring("win", 0, 1, { response: 0.4, damping: 0.85, record: true, label: "cancel" }, q => applyRect(lerpRect(curRect.__from || (curRect.__from = { ...curRect }), FULL, q))).then(() => { state.mode = "app"; delete curRect.__from; }); }
+  };
+  strip.addEventListener("pointerup", end); strip.addEventListener("pointercancel", end);
+})();
+
+/* ---------------- app switcher ---------------- */
+function showSwitcher() {
+  state.mode = "switcher";
+  $("#bottomStrip").classList.remove("on"); $("#indicator").classList.remove("on"); $("#status").classList.remove("on-app");
+  const rail = $("#rail"); rail.innerHTML = "";
+  state.opened.forEach(id => {
+    const a = appById(id), c = document.createElement("div");
+    c.className = "card"; c.dataset.app = id; c.dataset.entity = `card:${a.name}`;
+    c.innerHTML = `<div class="cap">${a.name}</div><div class="hd">${a.name}</div>${"<div class='ln'></div>".repeat(9)}`;
+    let st = null, tr = null, moved = false;
+    c.addEventListener("pointerdown", e => { e.stopPropagation(); c.setPointerCapture(e.pointerId); st = local(e); tr = tracker(); tr.add(st); moved = false; });
+    c.addEventListener("pointermove", e => { if (!st) return; const p = local(e); tr.add(p); const dy = p.y - st.y; if (Math.abs(dy) > 6) moved = true; c.style.transform = `translateY(${dy < 0 ? dy : rubber(dy, 200)}px)`; });
+    c.addEventListener("pointerup", e => {
+      if (!st) return; const p = local(e), v = tr.velocity(), dy = p.y - st.y, proj = dy + project(v.y); st = null;
+      if (!moved) { const r = rectOf(c); r.r = 34; c.style.visibility = "hidden"; win.style.display = "block"; openApp(id, null, { fromRect: r }); return; }
+      readout("card swipe", `${v.y.toFixed(0)} px/s`, `${proj.toFixed(0)} px`, proj < -250 ? "close app" : "keep");
+      if (proj < -250) {
+        spring("card-" + id, dy, -900, { response: 0.35, damping: 1, velocity: v.y }, y => c.style.transform = `translateY(${y}px)`).then(() => {
+          c.remove(); state.opened = state.opened.filter(x => x !== id); log("switcher", `closed ${a.name}`);
+          if (state.app === id) { state.app = null; win.style.display = "none"; }
+          if (!state.opened.length) hideSwitcher();
+        });
+      } else spring("card-" + id, dy, 0, { response: 0.4, damping: 0.7, velocity: v.y }, y => c.style.transform = `translateY(${y}px)`);
+    });
+    rail.append(c);
+  });
+  win.style.display = "none";
+  const sw = $("#switcher"); sw.style.display = "block";
+  spring("sw", 0, 1, { response: 0.35, damping: 1 }, p => { sw.style.opacity = p; rail.style.transform = `scale(${1.25 - 0.25 * p})`; });
+  log("switcher", `${state.opened.length} card(s)`);
+}
+function hideSwitcher() {
+  const sw = $("#switcher");
+  spring("sw", 1, 0, { response: 0.3, damping: 1 }, p => sw.style.opacity = p).then(() => { sw.style.display = "none"; state.mode = "home"; state.app = null; });
+}
+$("#switcher").addEventListener("click", e => { if (e.target.id === "switcher" || e.target.id === "rail") hideSwitcher(); });
+
+/* ---------------- navigation stack ---------------- */
+function navApply(p) { // p: 0 = list visible, 1 = detail visible
+  const d = $("#pDetail"), l = $("#pList"), dim = $("#dimList");
+  if (!d) return;
+  d.style.transform = `translateX(${(1 - p) * W}px)`;
+  d.style.boxShadow = p > 0 && p < 1 ? "-8px 0 24px rgba(0,0,0,.15)" : "none";
+  l.style.transform = `translateX(${-0.3 * W * p}px)`; // parallax: underlying page moves at 30%
+  dim.style.opacity = 0.12 * p;
+}
+let navP = 0;
+function push(item) {
+  $("#dTitle").textContent = item[0]; $("#dTitleSmall").textContent = "";
+  $("#dBody").innerHTML = `<p>${item[1]}.</p><p>Drag from the left edge to go back. The page follows your finger, the page underneath moves at 30% speed, and releasing projects your velocity forward to decide whether the swipe completes.</p>`;
+  $("#dBody").dataset.entity = `detail:${item[0]}`;
+  state.depth = 1; log("push", item[0]);
+  spring("nav", navP, 1, { response: 0.42, damping: 1 }, p => { navP = p; navApply(p); });
+}
+function pop(velocity = 0) {
+  state.depth = 0; log("pop", velocity ? `velocity ${velocity.toFixed(2)}/s` : "back button");
+  spring("nav", navP, 0, { response: 0.42, damping: 1, velocity }, p => { navP = p; navApply(p); });
+}
+(() => { // interactive edge swipe
+  let st = null, tr = null, startP = 1;
+  device.addEventListener("pointerdown", e => {
+    if (state.mode !== "app" || state.depth !== 1) return;
+    const p = local(e); if (p.x > 24 || p.y < 60 || p.y > H - 40) return;
+    st = p; tr = tracker(); tr.add(p); startP = navP; anims.get("nav") && (anims.get("nav").cancelled = true, anims.delete("nav"));
+    device.setPointerCapture(e.pointerId); log("edge swipe", "began");
+  });
+  device.addEventListener("pointermove", e => { if (!st) return; const p = local(e); tr.add(p); navP = Math.max(0, Math.min(1, startP - (p.x - st.x) / W)); navApply(navP); });
+  const end = e => {
+    if (!st) return; const p = local(e), v = tr.velocity(); st = null;
+    const dx = (1 - navP) * W, proj = dx + project(v.x);
+    const back = proj > W / 2;
+    readout("edge swipe", `${v.x.toFixed(0)} px/s`, `${proj.toFixed(0)} px`, back ? "pop" : "stay");
+    if (back) pop(-v.x / W); else { state.depth = 1; spring("nav", navP, 1, { response: 0.42, damping: 1, velocity: -v.x / W }, q => { navP = q; navApply(q); }); }
+  };
+  device.addEventListener("pointerup", end); device.addEventListener("pointercancel", end);
+})();
+
+/* ---------------- control panel (pull down from top) ---------------- */
+const panel = $("#panel"); let panelY = -860;
+function panelApply(y) { panelY = y; panel.style.transform = `translateY(${y}px)`; }
+function panelTo(open, velocity = 0) {
+  log("panel", open ? "open" : "close");
+  return spring("panel", panelY, open ? 0 : -860, { response: 0.45, damping: open ? 0.82 : 1, velocity }, panelApply);
+}
+(() => {
+  let st = null, tr = null, base = 0;
+  const begin = (e, from) => { st = local(e); tr = tracker(); tr.add(st); base = from; anims.get("panel") && (anims.get("panel").cancelled = true, anims.delete("panel")); e.target.setPointerCapture(e.pointerId); };
+  $("#topStrip").addEventListener("pointerdown", e => begin(e, -860));
+  panel.addEventListener("pointerdown", e => { if (e.target.closest("button,input,.notifs")) return; begin(e, panelY); });
+  const move = e => { if (!st) return; const p = local(e); tr.add(p); let y = base + (p.y - st.y); if (y > 0) y = rubber(y, H); panelApply(Math.max(-860, y)); };
+  const end = e => {
+    if (!st) return; const v = tr.velocity(); st = null;
+    const proj = panelY + project(v.y), open = proj > -430;
+    readout("pull down", `${v.y.toFixed(0)} px/s`, `${proj.toFixed(0)} px`, open ? "open" : "close");
+    panelTo(open, v.y);
+  };
+  for (const el of [$("#topStrip"), panel]) { el.addEventListener("pointermove", move); el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end); }
+})();
+document.querySelectorAll(".tilebtn").forEach(b => b.addEventListener("click", () => {
+  b.classList.toggle("on");
+  if (b.dataset.tile === "dark") setAppearance(b.classList.contains("on") ? "dark" : "light");
+  log("tile", `${b.textContent} ${b.classList.contains("on") ? "on" : "off"}`);
+}));
+function setAppearance(mode) {
+  device.classList.remove("dark", "light"); if (mode) device.classList.add(mode);
+  $("#darkTile").classList.toggle("on", mode === "dark" || (!mode && matchMedia("(prefers-color-scheme: dark)").matches));
+  const l = $("#apprLab"); if (l) l.textContent = mode ? mode[0].toUpperCase() + mode.slice(1) : "Follow page";
+  log("appearance", mode || "auto");
+}
+
+/* ---------------- intelligence: notification summary ---------------- */
+function summarize(list) {
+  // Stand-in for an on-device language model: group by sender app, keep the most informative sentence per group,
+  // surface times and quantities first. Deterministic, so its output is testable.
+  const groups = new Map();
+  for (const n of list) { if (!groups.has(n.app)) groups.set(n.app, []); groups.get(n.app).push(n); }
+  const score = t => (/\b\d{1,2}(:\d\d)?\s?(am|pm)\b|\bin \d+ minutes|\btoday\b|\btomorrow\b/i.test(t) ? 6 : 0) + Math.min(2, (t.match(/\d+/g) || []).length) + t.length / 60;
+  return [...groups].map(([app, ns]) => {
+    const best = ns.slice().sort((a, b) => score(b.text) - score(a.text))[0];
+    const who = [...new Set(ns.map(n => n.who))].join(", ");
+    return { app: appById(app).name, count: ns.length, line: `${who}: ${best.text.replace(/\.$/, "")}${ns.length > 1 ? ` (+${ns.length - 1} more)` : ""}` };
+  }).sort((a, b) => b.count - a.count);
+}
+window.__lab.summarize = summarize;
+$("#sumBtn").addEventListener("click", () => {
+  const s = summarize(NOTIFS), el = $("#summary");
+  el.innerHTML = s.map(g => `<div><b>${g.app} · ${g.count}</b> ${g.line}</div>`).join("");
+  el.hidden = false; log("summary", `${NOTIFS.length} notifications → ${s.length} groups`);
+});
+
+/* ---------------- assistant in the pill ---------------- */
+const island = $("#island"), glow = island.querySelector(".glow"), ask = island.querySelector(".ask"), live = island.querySelector(".live");
+const ISL = { w: 126, h: 37, r: 19 }, ISL_LIVE = { w: 220, h: 37, r: 19 }, ISL_ASK = { w: 366, h: 176, r: 34 };
+let islandState = "idle", islP = 0, islFrom = ISL, islTo = ISL;
+function islandApply(p) {
+  islP = p; const r = lerpRect({ x: 0, y: 0, ...islFrom }, { x: 0, y: 0, ...islTo }, p);
+  island.style.width = r.w + "px"; island.style.height = r.h + "px"; island.style.marginLeft = -r.w / 2 + "px"; island.style.borderRadius = r.r + "px";
+}
+function islandTo(target, name, opts = {}) {
+  const cur = { w: parseFloat(island.style.width) || ISL.w, h: parseFloat(island.style.height) || ISL.h, r: parseFloat(island.style.borderRadius) || ISL.r };
+  islFrom = cur; islTo = target; islandState = name;
+  island.classList.toggle("asking", name === "ask");
+  return spring("island", 0, 1, { response: 0.5, damping: name === "idle" ? 1 : 0.72, ...opts }, p => {
+    islandApply(p);
+    ask.style.opacity = name === "ask" ? Math.min(1, p * 1.5) : 0;
+    live.style.opacity = name === "live" ? p : 0;
+  });
+}
+function openAssistant(via) {
+  if (islandState === "ask") return;
+  glow.style.opacity = 1; log("assistant", `invoked by ${via}`);
+  readout("assistant", via, "–", "listening");
+  islandTo(ISL_ASK, "ask").then(() => { if (islandState === "ask") $("#askInput").focus(); });
+  $("#answer").innerHTML = "";
+}
+function closeAssistant() {
+  if (islandState !== "ask") return;
+  glow.style.opacity = 0; $("#askInput").blur(); islandTo(ISL, "idle");
+}
+(() => {
+  let st = null, timer = null, fired = false;
+  island.addEventListener("pointerdown", e => {
+    if (e.target.closest("input")) return;
+    st = local(e); fired = false; island.setPointerCapture(e.pointerId);
+    timer = setTimeout(() => { fired = true; openAssistant("press and hold"); }, 450);
+  });
+  island.addEventListener("pointermove", e => {
+    if (!st || fired) return; const p = local(e), dy = p.y - st.y;
+    if (Math.abs(dy) > 6) clearTimeout(timer);
+    if (dy > 0 && islandState !== "ask") { island.style.height = ISL.h + rubber(dy, 300) + "px"; glow.style.opacity = Math.min(1, dy / 40); }
+    if (dy > 40) { fired = true; openAssistant("swipe down on the pill"); }
+  });
+  island.addEventListener("pointerup", e => {
+    clearTimeout(timer); if (!st) return; st = null;
+    if (fired || islandState === "ask") return;
+    glow.style.opacity = 0;
+    islandTo(islandState === "live" ? ISL : ISL_LIVE, islandState === "live" ? "idle" : "live");
+    log("pill", islandState === "live" ? "expanded live activity" : "collapsed");
+  });
+  island.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target === island) { e.preventDefault(); openAssistant("keyboard"); } });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeAssistant(); });
+  device.addEventListener("pointerdown", e => { if (islandState === "ask" && !island.contains(e.target)) closeAssistant(); }, true);
+})();
+
+// App Intents analogue: a registry of typed intents the assistant can match natural language against.
+const INTENTS = [
+  { name: "OpenAppIntent", re: /\b(open|launch|start)\s+(?:the\s+)?(\w+)/i, run: m => { const a = APPS.find(x => x.name.toLowerCase().startsWith(m[2].toLowerCase())); if (!a) return `No app called “${m[2]}”.`; setTimeout(() => { if (state.mode === "app") { goHome().then(() => openApp(a.id, document.querySelector(`.icon[data-app="${a.id}"] .tile`))); } else openApp(a.id, document.querySelector(`.icon[data-app="${a.id}"] .tile`)); }, 250); return `Opening <b>${a.name}</b>.`; } },
+  { name: "GoHomeIntent", re: /\b(go\s+)?home\b|close (the )?app/i, run: () => { if (state.mode === "app") setTimeout(() => goHome(), 250); return "Going to the Home Screen."; } },
+  { name: "SetGlassIntent", re: /\bglass\b.*?(\d{1,3}|clear|tint(?:ed)?|frosted)/i, run: m => { const v = { clear: 0, frosted: 50, tint: 100, tinted: 100 }[m[1].toLowerCase()] ?? +m[1]; return `Glass set to <b>${setGlass(v, "assistant")}%</b>.`; } },
+  { name: "SetAppearanceIntent", re: /\b(dark|light)\s*(mode)?\b/i, run: m => { setAppearance(m[1].toLowerCase()); return `Switched to <b>${m[1].toLowerCase()}</b> appearance.`; } },
+  { name: "SummarizeIntent", re: /\bsummar/i, run: () => summarize(NOTIFS).map(g => `<b>${g.app}</b> ${g.line}`).join("<br>") },
+  { name: "ScreenContextIntent", re: /\b(on|this) screen\b|what.*(see|showing)/i, run: () => {
+      const ents = visibleEntities();
+      return ents.length ? `I can see ${ents.length} things: ${ents.slice(0, 6).map(x => `<b>${x}</b>`).join(", ")}${ents.length > 6 ? "…" : ""}` : "Nothing annotated is on screen.";
+    } },
+];
+// View Annotations analogue: elements declare entities via data-entity; the assistant reads only what is visible.
+function visibleEntities() {
+  const d = device.getBoundingClientRect(), out = [];
+  device.querySelectorAll("[data-entity]").forEach(el => {
+    if (el === device) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height || r.right < d.left || r.left > d.right || r.bottom < d.top || r.top > d.bottom) return;
+    if (el.closest("#panel") && panelY < -400) return;
+    if (el.closest("#appWin") && win.style.display === "none") return;
+    if (el.closest("#home") && state.mode === "app") return;
+    if (el.closest("#pDetail") && state.depth === 0) return;
+    if (el.closest("#pList") && state.depth === 1) return;
+    let hidden = false; for (let p = el; p && p !== device; p = p.parentElement) if (getComputedStyle(p).display === "none") { hidden = true; break; }
+    if (!hidden) out.push(el.dataset.entity);
+  });
+  return [...new Set(out)];
+}
+window.__lab.visibleEntities = visibleEntities;
+function handleAsk(text) {
+  const t = text.trim(); if (!t) return "";
+  for (const it of INTENTS) { const m = t.match(it.re); if (m) { log("intent", `${it.name} ← “${t}”`); return it.run(m); } }
+  log("intent", `no match ← “${t}”`);
+  return "I can open apps, go home, set the glass level, switch dark or light, summarize notifications, or describe what is on screen.";
+}
+window.__lab.ask = handleAsk;
+$("#askInput").addEventListener("keydown", e => { if (e.key === "Enter") { $("#answer").innerHTML = handleAsk(e.target.value); e.target.value = ""; } });
+
+/* ---------------- instruments wiring ---------------- */
+const bind = (id, out, fmt) => { const i = $("#" + id), o = $("#" + out); const f = () => o.value = fmt(+i.value); i.addEventListener("input", f); f(); };
+bind("tResp", "oResp", v => v.toFixed(2)); bind("tDamp", "oDamp", v => v.toFixed(2)); bind("tSlow", "oSlow", v => v + "×");
+$("#copyCsv").addEventListener("click", () => {
+  if (!lastCurve) return;
+  const csv = "t,x\n" + lastCurve.samples.map(([t, y]) => `${t.toFixed(5)},${y.toFixed(5)}`).join("\n");
+  const ta = $("#csv"); ta.value = csv; ta.hidden = false;
+  navigator.clipboard?.writeText(csv).then(() => log("csv", "copied to clipboard"), () => { ta.select(); log("csv", "select the text box to copy"); });
+});
+$("#replay").addEventListener("click", async () => {
+  if (state.mode === "app") await goHome();
+  if (state.mode === "home") { const id = state.app || "notes"; openApp(id, document.querySelector(`.icon[data-app="${id}"] .tile`)); }
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawCurve);
+new MutationObserver(drawCurve).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+drawCurve();
+setInterval(() => { const d = new Date(); $("#clock").textContent = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")}`; }, 10000);
+let remain = 299; setInterval(() => { remain = remain > 0 ? remain - 1 : 299; $("#liveTime").textContent = `${String(remain / 60 | 0).padStart(2, "0")}:${String(remain % 60).padStart(2, "0")}`; }, 1000);
+
+/* ---------------- evidence ledger ---------------- */
+const SRC = {
+  devIos: ["developer.apple.com/wwdc26/guides/ios", "https://developer.apple.com/wwdc26/guides/ios/"],
+  devSwiftUI: ["developer.apple.com/wwdc26/guides/swiftui", "https://developer.apple.com/wwdc26/guides/swiftui/"],
+  appleOs: ["apple.com/os/ios (search snippet)", "https://www.apple.com/os/ios/"],
+  applePost: ["theapplepost.com, 8 Jun 2026 (headline)", "https://www.theapplepost.com/2026/06/08/70870/ios-27-introduces-new-siri-animation-and-swipe-to-ask-gesture/"],
+  techRep: ["techrepublic.com (search snippet)", "https://www.techrepublic.com/article/news-apple-ios-27-siri-ai-liquid-glass-performance/"],
+  macworld: ["macworld.com iOS 27 guide (search snippet)", "https://www.macworld.com/article/2986799/ios-27-features-compatiblity-siri-ai-updates.html"],
+  wwdc18: ["WWDC18 session 803, Designing Fluid Interfaces", "https://developer.apple.com/videos/play/wwdc2018/803/"],
+  decel: ["UIScrollView.DecelerationRate", "https://developer.apple.com/documentation/uikit/uiscrollview/decelerationrate"],
+  spring: ["SwiftUI Animation.spring(response:dampingFraction:blendDuration:)", "https://developer.apple.com/documentation/swiftui/animation/spring(response:dampingfraction:blendduration:)"],
+};
+const link = k => `<a href="${SRC[k][1]}" target="_blank" rel="noopener">${SRC[k][0]}</a>`;
+const LEDGER = [
+  ["Refreshed materials, typography, tab and navigation bars", "A", `“Refreshed materials, refined typography, and updated tab and navigation bars unify Apple platforms…” ${link("devIos")}`, "Glass tab bar, nav bar background that appears on scroll, large title that shrinks into an inline title.", "Scroll a stock list (Settings). Record at 120 fps; track title scale with <code>tools/track_video.py --axis scale</code>."],
+  ["Navigation bar collapses while scrolling", "A", `<code>toolbarMinimizeBehavior</code> “automatically collapses the navigation bar when scrolling” ${link("devSwiftUI")}`, "Tab bar narrows to one item on scroll down and restores on scroll up, using a 0.42 s spring.", "Build a SwiftUI test app with the modifier and record the transition; fit with <code>tools/spring_fit.py</code>."],
+  ["Glass material adjustable from clear to tinted", "B", `Search snippet: “a new slider lets you easily customize how Liquid Glass looks, from ultraclear to fully tinted.” ${link("appleOs")}`, "One <code>--glass</code> value (0–1) drives tint opacity and blur radius on every glass surface. Slider in the control panel and the Settings app.", "Capture the same screen at slider 0, 50 and 100. Compare background luminance variance behind a bar to estimate blur and tint."],
+  ["Assistant animation lives in the pill, not the screen edge", "B", `Search snippet: Siri “no longer lights up the edges of the display… a new animation appears directly within the Dynamic Island.” Search summary; the outlet was not isolated. Related headline: ${link("applePost")}`, "The black pill springs open (0.5 s, ζ 0.72) into a prompt with a rotating spectral glow inside it.", "Invoke Siri while screen-recording; measure pill width over time and fit the spring."],
+  ["New gesture to ask the assistant", "B", `Headline only: “new Siri animation and swipe-to-ask gesture”. Direction and origin not confirmed. ${link("applePost")}`, "Our own choice: drag down on the pill (or press and hold). Labelled as an assumption.", "Confirm the gesture's start zone and direction on device, then change the handler in <code>prototype/index.html</code>."],
+  ["Refined animations, scrolling and responsiveness", "B", `Search snippet: “refined animations, scrolling, and other system interactions… to make the iPhone feel more responsive.” Search summary; likely ${link("techRep")}, not confirmed`, "All motion uses interruptible springs: grabbing a moving window or page takes over from its current position and velocity.", "Compare launch curves between iOS 26 and iOS 27 on the same device with <code>tools/spring_fit.py</code>."],
+  ["Content and actions exposed to the assistant through intents", "A", `“Siri now connects to more of what people do in your app through the App Intents framework…” ${link("devIos")}`, "A typed intent registry (OpenApp, GoHome, SetGlass, SetAppearance, Summarize, ScreenContext). The log shows which intent matched.", "Ship an App Intent in a test app and check which phrasings resolve to it."],
+  ["Assistant can act on what is on screen", "A", `“The new View Annotations API lets you map your views to entities so people can reference and act on what's on screen conversationally.” ${link("devIos")}`, "Elements carry <code>data-entity</code>. Ask “what's on screen”: only entities visible right now are returned.", "Annotate views in a test app; ask Siri about on-screen items and record which are resolved."],
+  ["On-device model available to apps", "A", `“The Foundation Models framework… gives you direct access to the same on-device model that powers Apple Intelligence.” ${link("devIos")}`, "Notification summary uses a deterministic heuristic as a stand-in. It does not run a language model.", "Replace <code>summarize()</code> logic with a Foundation Models call in a native build."],
+  ["Live playback in the pill and Lock Screen", "A", `“The NowPlaying framework connects your app's playback to the Lock Screen, Control Center, Dynamic Island, and CarPlay.” ${link("devIos")}`, "Tap the pill: it expands into a live timer activity and collapses on a second tap.", "Start playback in Music and record the pill's expansion."],
+  ["Drag to reorder in any container", "A", `“reorderable container APIs… drag to rearrange items in any container — not just List” ${link("devSwiftUI")}`, "Not recreated here.", "–"],
+  ["Gesture release uses velocity projection", "C", `Projection with the scroll view's deceleration rate, presented in ${link("wwdc18")}; rate constant from ${link("decel")}`, "<code>project(v) = v/1000 · 0.998/(1−0.998)</code>. Home swipe, edge swipe, panel and cards all decide on the projected end point.", "Flick quickly over a short distance: it should still go home. Drag slowly a long way and pause: it should open the switcher."],
+  ["Spring parameters: response and damping fraction", "C", `${link("spring")}`, "Every animation is a unit-mass spring with k = (2π/response)², c = 4π·ζ/response, integrated at 1 ms steps.", "<code>tests/test_spring_fit.py</code> shows the fitter recovers known springs. Fit real recordings the same way."],
+  ["Reduce Motion replaces zooms with cross-fades", "C", "Long-standing accessibility behaviour (Settings › Accessibility › Motion). Not re-checked for iOS 27.", "The Reduce motion switch, or the OS preference, swaps launch and dismiss zooms for opacity fades.", "Turn on Reduce Motion and record an app launch."],
+  ["Rubber-band resistance past the edge", "D", "Constant 0.55 comes from community reverse engineering of UIScrollView, not Apple documentation.", "<code>rubber(x, d) = (1 − 1/(0.55·x/d + 1))·d</code> on the panel, the pill and switcher cards.", "Overscroll a list and plot finger position against content offset; fit c."],
+  ["Interactive back with 30% parallax", "D", "Matches long-standing UINavigationController behaviour as observed. The 30% value is a measured approximation, not documented.", "Drag from the left edge of a detail page. The list underneath moves at 0.3× and dims.", "Record an edge swipe and compare the two pages' x offsets frame by frame."],
+];
+$("#ledgerBody").innerHTML = LEDGER.map(([f, g, e, how, ver]) => `<tr><td><b>${f}</b></td><td><span class="chip ${g}">${g}</span></td><td>${e}</td><td>${how}</td><td>${ver}</td></tr>`).join("");
+})();
+</script>
