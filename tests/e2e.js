@@ -7,7 +7,8 @@ const { execFileSync } = require("child_process");
 
 const root = path.join(__dirname, "..");
 const html = "<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'></head><body>" +
-  fs.readFileSync(path.join(root, "prototype/index.html"), "utf8") + "</body></html>";
+  fs.readFileSync(path.join(root, "prototype/index.html"), "utf8")
+    .replace('<script src="search-engine.js"></script>', () => "<script>" + fs.readFileSync(path.join(root, "prototype/search-engine.js"), "utf8") + "</script>") + "</body></html>";
 
 let failures = 0;
 const check = (name, ok, info = "") => { console.log(`${ok ? "PASS" : "FAIL"}  ${name}${info ? "  — " + info : ""}`); if (!ok) failures++; };
@@ -134,6 +135,43 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "PASS" : "FAIL"}  $
   await drag(at(300, 700), at(300, 200), { steps: 5, stepMs: 12 }); await page.waitForTimeout(700);
   await page.click('.icon[data-app="settings"]'); await waitMode("app");
   await page.screenshot({ path: path.join(root, "docs/screens/lab.png"), fullPage: true });
+
+  // 14. Search: swipe down in the middle of the Home Screen
+  await drag(at(195, 835), at(195, 650), { steps: 4, stepMs: 12 }); await waitMode("home"); await page.waitForTimeout(300);
+  await page.waitForFunction(() => /indexed on this device/.test(document.querySelector("#sStatus").textContent), null, { timeout: 4000 });
+  await drag(at(195, 400), at(195, 560), { steps: 6, stepMs: 14 });
+  await page.waitForTimeout(700);
+  check("swipe down mid-screen opens search", (await state()).mode === "search" && await page.$eval("#sInput", e => document.activeElement === e), `decision=${await decision()}`);
+  await page.keyboard.type("dentist"); await page.waitForTimeout(250);
+  const top = await page.$eval("#sResults .srow", e => e.dataset.id + "|" + e.textContent);
+  check("'dentist' returns the Dr. Patel note by meaning", top.startsWith("note:") && /Patel/.test(top) && /meaning/.test(top), top);
+  await page.screenshot({ path: path.join(root, "docs/screens/search-meaning.png"), clip: { x: dev.x - 12, y: dev.y - 12, width: dev.width + 24, height: dev.height + 24 } });
+  const inspector = await page.$eval("#sTBody tr", e => e.textContent);
+  check("inspector shows per-ranker ranks", /Patel/.test(inspector), inspector);
+  await page.fill("#sInput", "ma"); await page.waitForTimeout(400);
+  const prov = await page.$eval("#sProv", e => e.textContent);
+  check("live provider results arrive after indexed ones", /Mara Lind/.test(prov) && /live lookup/.test(prov), prov.slice(0, 60));
+  await page.fill("#sInput", "wether"); await page.waitForTimeout(100);
+  check("typo-tolerant top hit", (await page.$eval("#sResults .tophit .srow", e => e.dataset.id)) === "app:weather");
+  await page.screenshot({ path: path.join(root, "docs/screens/search.png"), clip: { x: dev.x - 12, y: dev.y - 12, width: dev.width + 24, height: dev.height + 24 } });
+  await page.keyboard.press("Enter"); await waitMode("app");
+  check("Enter opens the top hit", (await state()).app === "weather");
+
+  // 15. Index maintenance through the assistant, then search finds it immediately
+  await page.evaluate(() => window.__lab.ask("new note: Call the plumber about the leak"));
+  await page.evaluate(() => window.__lab.openSearch("plumber")); await page.waitForTimeout(1200);
+  const hit = await page.$eval("#sResults .srow", e => e.textContent);
+  check("a new note is searchable at once", /plumber/i.test(hit), hit.slice(0, 50));
+  await page.keyboard.press("ArrowDown"); await page.keyboard.press("ArrowUp"); await page.keyboard.press("Enter");
+  await page.waitForTimeout(300);
+  await waitMode("app"); await page.waitForTimeout(600);
+  check("opening a note result navigates into the note", (await state()).app === "notes" && (await state()).depth === 1 && /plumber/i.test(await page.$eval("#dTitle", e => e.textContent)));
+
+  // 16. Ask fallback and search intent
+  await page.evaluate(() => window.__lab.ask("search for vacation")); await page.waitForTimeout(1300);
+  check("SearchIntent opens search with the query", (await page.$eval("#sInput", e => e.value)) === "vacation" && /Trip/.test(await page.$eval("#sResults .srow", e => e.textContent)));
+  await page.click('.srow[data-id="ask"]'); await page.waitForTimeout(800);
+  check("Ask row hands the query to the assistant", await page.$eval("#island", e => e.classList.contains("asking")));
 
   check("no page errors", errors.length === 0, errors.join(" | "));
   await browser.close();

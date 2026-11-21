@@ -207,6 +207,48 @@ td a { color: var(--accent); overflow-wrap: anywhere; }
 .chip.D { background: var(--chip-d); color: var(--dim); }
 code { font-family: var(--f-mono); font-size: .92em; }
 @media (prefers-reduced-motion: reduce) { #island .glow { animation: none; } }
+
+/* search */
+#search { position: absolute; inset: 0; z-index: 42; display: none; flex-direction: column; padding: 62px 0 0; color: var(--glass-ink);
+  background: color-mix(in srgb, var(--glass-tint) calc(30% + var(--glass, .35) * 50%), transparent);
+  backdrop-filter: blur(30px) saturate(170%); -webkit-backdrop-filter: blur(30px) saturate(170%); }
+#search .bar { display: flex; align-items: center; gap: 10px; padding: 0 16px 10px; }
+#search .field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 44px; border-radius: 22px; padding: 0 14px; }
+#search .field svg { flex: none; opacity: .6; }
+#search input { flex: 1; min-width: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 17px; outline: none; }
+#search input::placeholder { color: inherit; opacity: .5; }
+#search .cancel { border: 0; background: none; font: inherit; font-size: 16px; color: var(--accent); cursor: pointer; padding: 6px 2px; }
+#search .status { font-size: 11px; padding: 0 24px 6px; opacity: .65; font-variant-numeric: tabular-nums; }
+#sResults { flex: 1; overflow-y: auto; padding: 0 12px 40px; display: flex; flex-direction: column; gap: 14px; touch-action: pan-y; scrollbar-width: none; }
+#sResults::-webkit-scrollbar { display: none; }
+.sgroup { display: flex; flex-direction: column; gap: 6px; }
+.sgroup:empty { display: none; }
+#search .cancel { flex: none; }
+.sgroup h4 { margin: 0 8px; font-size: 13px; font-weight: 600; opacity: .7; display: flex; justify-content: space-between; }
+.sgroup h4 small { font-weight: 500; font-size: 11px; opacity: .8; }
+.slist { border-radius: 20px; overflow: hidden; }
+.srow { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 9px 14px; cursor: pointer; border-bottom: 1px solid color-mix(in srgb, var(--glass-ink) 10%, transparent); }
+.srow:last-child { border-bottom: 0; }
+.srow.sel, .srow:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.srow .sic { grid-row: span 2; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
+.srow .st { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow .ss { font-size: 12px; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; grid-column: 2; }
+.srow .src { grid-row: span 2; grid-column: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 11px; opacity: .75; }
+.srow mark { background: none; color: inherit; font-weight: 700; }
+.why { font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--glass-ink) 12%, transparent); }
+.why.meaning { background: color-mix(in srgb, #8b5cf6 35%, transparent); }
+.why.typo { background: color-mix(in srgb, #f59e0b 35%, transparent); }
+.why.provider { background: color-mix(in srgb, #10b981 35%, transparent); }
+.tophit .srow { padding: 14px; grid-template-columns: 52px minmax(0, 1fr) auto; }
+.tophit .sic { width: 52px; height: 52px; border-radius: 14px; font-size: 22px; }
+.tophit .st { font-size: 18px; font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px; }
+.chips button { border: 0; border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 13px; color: inherit; cursor: pointer; }
+.sempty { text-align: center; font-size: 13px; opacity: .7; padding: 18px; }
+#sTable { width: 100%; min-width: 0; font-size: 12px; border-collapse: collapse; }
+#sTable th, #sTable td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+#sTable td:not(:first-child), #sTable th:not(:first-child) { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+#sTable td:first-child { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 
 <div class="wrap">
@@ -241,6 +283,16 @@ code { font-family: var(--f-mono); font-size: .92em; }
           <div id="appWin"><div class="content" id="appContent"></div><div class="splash" id="splash"></div></div>
           <div id="switcher"><div class="rail" id="rail"></div><div class="switch-empty">Swipe a card up to close it · tap outside to go home</div></div>
 
+          <div id="search" role="dialog" aria-label="Search">
+            <div class="bar">
+              <label class="field glass" for="sInput"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input id="sInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search or ask" aria-controls="sResults"></label>
+              <button class="cancel" id="sCancel">Cancel</button>
+            </div>
+            <div class="status" id="sStatus">Preparing index…</div>
+            <div id="sResults" role="listbox"></div>
+          </div>
+
           <div id="panel" class="glass">
             <div class="tiles">
               <button class="tilebtn glass on" data-tile="wifi">Wi-Fi</button>
@@ -264,7 +316,7 @@ code { font-family: var(--f-mono); font-size: .92em; }
           <div id="indicator"></div>
         </div>
       </div>
-      <div class="stage-note">Use mouse or touch. Swipe up from the bar at the bottom of an open app. Pull down from the top edge. Drag down on the black pill to ask.</div>
+      <div class="stage-note">Use mouse or touch. Swipe up from the bar at the bottom of an open app. Pull down from the top edge. Drag down on the black pill to ask. Swipe down in the middle of the Home Screen to search.</div>
     </div>
 
     <div class="instruments">
@@ -308,6 +360,19 @@ code { font-family: var(--f-mono); font-size: .92em; }
       </div>
 
       <div class="box">
+        <h2>Search inspector</h2>
+        <p class="sub">Three rankers score every indexed item. Their rankings are merged with reciprocal rank fusion. The columns show each ranker's rank for the top results.</p>
+        <div class="read">
+          <div><small>Query</small><output id="iQuery">–</output></div>
+          <div><small>Latency</small><output id="iMs">–</output></div>
+          <div><small>Index</small><output id="iIdx">–</output></div>
+          <div><small>Concepts</small><output id="iCon">–</output></div>
+        </div>
+        <div style="overflow-x:auto;margin-top:10px"><table id="sTable"><thead><tr><th>Result</th><th>Keyword</th><th>Meaning</th><th>Typo</th><th>Fused</th></tr></thead><tbody id="sTBody"><tr><td colspan="5" style="color:var(--muted)">Search for something to see how it ranks</td></tr></tbody></table></div>
+        <div class="btns"><button class="b" id="openSearch">Open search</button><button class="b" data-q="dentist">Try “dentist”</button><button class="b" data-q="wether">Try “wether”</button><button class="b" data-q="night theme">Try “night theme”</button></div>
+      </div>
+
+      <div class="box">
         <h2>Event log</h2>
         <ul id="log"></ul>
       </div>
@@ -333,6 +398,7 @@ code { font-family: var(--f-mono); font-size: .92em; }
   </section>
 </div>
 
+<script src="search-engine.js"></script>
 <script>
 (() => {
 "use strict";
@@ -465,7 +531,7 @@ const APPS = [
 ];
 const DOCK = ["messages", "gallery", "music", "settings"];
 const ITEMS = {
-  notes: [["Trip checklist", "Passport, chargers, the blue jacket"], ["Spring curves", "response 0.5, damping 0.86 feels right"], ["Groceries", "Oats, lemons, coffee beans"], ["Ideas", "A clock that shows tides"], ["Reading list", "Three essays on interface motion"], ["Workout", "Intervals, 6 × 400 m"], ["Recipes", "Miso soup, quick version"], ["Gift ideas", "Fountain pen, plant stand"], ["Meeting notes", "Ship the beta on Thursday"], ["Packing", "Tent, stove, headlamp"], ["Quotes", "Make it simple, but significant"], ["Wishlist", "Bike lights"]],
+  notes: [["Trip checklist", "Passport, chargers, the blue jacket"], ["Dr. Patel", "Cleaning on Tuesday at 3 pm, bring insurance card"], ["Spring curves", "response 0.5, damping 0.86 feels right"], ["Groceries", "Oats, lemons, coffee beans"], ["Ideas", "A clock that shows tides"], ["Reading list", "Three essays on interface motion"], ["Workout", "Intervals, 6 × 400 m"], ["Recipes", "Miso soup, quick version"], ["Gift ideas", "Fountain pen, plant stand"], ["Meeting notes", "Ship the beta on Thursday"], ["Packing", "Tent, stove, headlamp"], ["Quotes", "Make it simple, but significant"], ["Wishlist", "Bike lights"]],
   default: [["Today", "3 updates"], ["Yesterday", "1 update"], ["This week", "12 items"], ["Pinned", "4 items"], ["Shared with you", "2 items"], ["Archive", "128 items"], ["Recently deleted", "Kept for 30 days"], ["Favourites", "9 items"], ["Downloads", "Empty"], ["Drafts", "2 items"], ["Tags", "6 tags"], ["Help", "Tips and shortcuts"]],
 };
 const NOTIFS = [
@@ -513,6 +579,8 @@ const win = $("#appWin"), content = $("#appContent"), splash = $("#splash");
 const state = { app: null, opened: [], depth: 0, mode: "home" };
 window.__lab.state = state;
 const FULL = { x: 0, y: 0, w: W, h: H, r: R };
+const staleApps = new Set();
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 function rectOf(el) {
   const d = device.getBoundingClientRect(), r = el.getBoundingClientRect();
   return { x: (r.left - d.left) / S, y: (r.top - d.top) / S, w: r.width / S, h: r.height / S, r: 16 };
@@ -594,7 +662,7 @@ async function openApp(id, fromEl, { fromRect } = {}) {
   if (state.mode === "opening") return;
   closeAssistant();
   const a = appById(id);
-  if (state.app !== id) buildApp(id);
+  if (state.app !== id || staleApps.delete(id)) buildApp(id);
   state.app = id; state.mode = "opening";
   if (!state.opened.includes(id)) state.opened.unshift(id); else { state.opened.splice(state.opened.indexOf(id), 1); state.opened.unshift(id); }
   $("#switcher").style.display = "none";
@@ -852,6 +920,8 @@ function closeAssistant() {
 
 // App Intents analogue: a registry of typed intents the assistant can match natural language against.
 const INTENTS = [
+  { name: "SearchIntent", re: /^\s*(?:search(?: for)?|find|look up)\s+(.+)/i, run: m => { setTimeout(() => openSearch(m[1]), 250); return `Searching for <b>${esc(m[1])}</b>.`; } },
+  { name: "CreateNoteIntent", re: /^\s*(?:new|create|add)(?: a)? note:?\s+(.+)/i, run: m => { const n = addNote(m[1]); return `Saved note <b>${esc(n[0])}</b>. It is searchable now.`; } },
   { name: "OpenAppIntent", re: /\b(open|launch|start)\s+(?:the\s+)?(\w+)/i, run: m => { const a = APPS.find(x => x.name.toLowerCase().startsWith(m[2].toLowerCase())); if (!a) return `No app called “${m[2]}”.`; setTimeout(() => { if (state.mode === "app") { goHome().then(() => openApp(a.id, document.querySelector(`.icon[data-app="${a.id}"] .tile`))); } else openApp(a.id, document.querySelector(`.icon[data-app="${a.id}"] .tile`)); }, 250); return `Opening <b>${a.name}</b>.`; } },
   { name: "GoHomeIntent", re: /\b(go\s+)?home\b|close (the )?app/i, run: () => { if (state.mode === "app") setTimeout(() => goHome(), 250); return "Going to the Home Screen."; } },
   { name: "SetGlassIntent", re: /\bglass\b.*?(\d{1,3}|clear|tint(?:ed)?|frosted)/i, run: m => { const v = { clear: 0, frosted: 50, tint: 100, tinted: 100 }[m[1].toLowerCase()] ?? +m[1]; return `Glass set to <b>${setGlass(v, "assistant")}%</b>.`; } },
@@ -889,6 +959,208 @@ function handleAsk(text) {
 window.__lab.ask = handleAsk;
 $("#askInput").addEventListener("keydown", e => { if (e.key === "Enter") { $("#answer").innerHTML = handleAsk(e.target.value); e.target.value = ""; } });
 
+
+/* ---------------- search ---------------- */
+const SE = window.GlasslineSearch, index = SE.createIndex();
+window.__lab.index = index;
+const TYPE_LABEL = { app: "Apps", action: "Actions", note: "Notes", setting: "Settings", notification: "Notifications", contact: "Contacts" };
+const ALIASES = { gallery: ["photos", "pictures"], clock: ["alarm", "timer", "stopwatch"], health: ["fitness", "steps"], messages: ["texts", "chat"], files: ["documents"], calendar: ["events", "schedule"], music: ["songs"], maps: ["directions"], settings: ["preferences"] };
+const SETTINGS = [
+  { id: "wifi", title: "Wi-Fi", keys: ["network", "internet"], body: "Join networks", go: "panel" },
+  { id: "bt", title: "Bluetooth", keys: ["headphones", "speaker"], body: "Connect accessories", go: "panel" },
+  { id: "focus", title: "Focus", keys: ["do not disturb", "silence"], body: "Limit notifications", go: "panel" },
+  { id: "glass", title: "Glass material", keys: ["tint", "clear", "transparency", "blur"], body: "From clear to tinted", go: "settings" },
+  { id: "appearance", title: "Appearance", keys: ["dark mode", "light mode", "theme"], body: "Light, dark or automatic", go: "settings" },
+  { id: "motion", title: "Reduce Motion", keys: ["accessibility", "animation"], body: "Replace zooms with fades", go: "reduce" },
+];
+const ACTIONS = [
+  { id: "newnote", title: "New note", keys: ["create", "write", "add"], body: "Create a note in Notes", run: () => openAssistantWith("new note ") },
+  { id: "summarize", title: "Summarize notifications", keys: ["digest", "catch up"], body: "Group and condense alerts", run: () => { panelTo(true); setTimeout(() => $("#sumBtn").click(), 400); } },
+  { id: "dark", title: "Turn on Dark Mode", keys: ["night", "theme"], body: "Appearance", run: () => setAppearance("dark") },
+  { id: "light", title: "Turn on Light Mode", keys: ["day", "theme"], body: "Appearance", run: () => setAppearance("light") },
+  { id: "clear", title: "Make glass clear", keys: ["transparent", "material"], body: "Glass material 0%", run: () => setGlass(0) },
+  { id: "tinted", title: "Make glass tinted", keys: ["opaque", "frosted", "material"], body: "Glass material 100%", run: () => setGlass(100) },
+];
+const CONTACTS = ["Mara Lind", "Dev Okafor", "Mia Torres", "Sam Reyes", "Noor Haddad", "Theo Brandt"];
+function corpus() {
+  return [
+    ...APPS.map(a => ({ id: "app:" + a.id, type: "app", title: a.name, keys: ALIASES[a.id] || [], source: a.id })),
+    ...ITEMS.notes.map(([t, b], i) => ({ id: "note:" + i, type: "note", title: t, body: b, source: "notes", ref: i })),
+    ...SETTINGS.map(x => ({ id: "set:" + x.id, type: "setting", title: x.title, keys: x.keys, body: x.body, source: "settings", ref: x })),
+    ...NOTIFS.map((n, i) => ({ id: "ntf:" + i, type: "notification", title: n.who, body: n.text, source: n.app })),
+    ...ACTIONS.map(x => ({ id: "act:" + x.id, type: "action", title: x.title, keys: x.keys, body: x.body, source: "settings", ref: x })),
+  ];
+}
+// EntityStringQuery analogue: contacts are not indexed; they are matched live, after a simulated lookup delay.
+index.addProvider({ name: "Contacts", query: q => new Promise(res => setTimeout(() => {
+  const f = q.trim().toLowerCase(); if (f.length < 2) return res([]);
+  res(CONTACTS.filter(n => n.toLowerCase().split(" ").some(w => w.startsWith(f)) || n.toLowerCase().startsWith(f))
+    .map(n => ({ id: "contact:" + n, type: "contact", title: n, body: "Contact · matched by the provider", source: "messages" })));
+}, 140)) });
+
+let indexing = true;
+function buildIndex() { // background indexing in small batches, as on first launch
+  const all = corpus(); let i = 0; indexing = true;
+  index.reindex([]);
+  const step = () => {
+    index.add(all.slice(i, i + 6)); i += 6;
+    setStatus();
+    if (i < all.length) (window.requestIdleCallback || (f => setTimeout(f, 16)))(step);
+    else { indexing = false; setStatus(); log("index", `${index.size} entities, ${index.terms} terms`); if (sOpen) runSearch(); }
+  };
+  step();
+}
+function setStatus(extra = "") {
+  const s = indexing ? `Indexing… ${index.size} items so far` : `${index.size} items indexed on this device`;
+  $("#sStatus").textContent = extra ? `${s} · ${extra}` : s;
+  $("#iIdx").value = `${index.size} ent · ${index.terms} terms · gen ${index.generation}`;
+}
+function addNote(text) {
+  const t = text.trim(), title = t.split(/[,.;:]/)[0].slice(0, 36), n = [title.charAt(0).toUpperCase() + title.slice(1), t];
+  ITEMS.notes.push(n); const i = ITEMS.notes.length - 1;
+  index.add({ id: "note:" + i, type: "note", title: n[0], body: n[1], source: "notes", ref: i });
+  staleApps.add("notes"); setStatus(); log("index", `added note:${i} (gen ${index.generation})`);
+  return n;
+}
+window.__lab.addNote = addNote;
+
+const RECENT_KEY = "glassline.recentSearches";
+function recents() { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; } }
+function remember(q) { try { const r = [q, ...recents().filter(x => x !== q)].slice(0, 5); localStorage.setItem(RECENT_KEY, JSON.stringify(r)); } catch {} }
+
+const sEl = $("#search"), sInput = $("#sInput"), sRes = $("#sResults");
+let sOpen = false, sP = 0, rows = [], sel = 0, providerSeq = 0;
+function searchApply(p) {
+  sP = p; sEl.style.display = p > 0.001 ? "flex" : "none"; sEl.style.opacity = Math.min(1, p);
+  sEl.querySelector(".bar").style.transform = `translateY(${-24 * (1 - p)}px)`;
+  $("#home").style.transform = `scale(${1 - 0.06 * Math.min(1, p)})`; $("#home").style.filter = p > 0.01 ? `blur(${6 * Math.min(1, p)}px)` : "";
+}
+function openSearch(q, velocity = 0) {
+  if (state.mode === "app") { goHome().then(() => openSearch(q)); return; }
+  closeAssistant(); if (panelY > -800) panelTo(false);
+  sOpen = true; state.mode = "search";
+  if (q !== undefined) sInput.value = q;
+  runSearch(); searchApply(Math.max(sP, 0.01)); sInput.focus({ preventScroll: true });
+  spring("search", sP, 1, { response: 0.38, damping: 0.86, velocity }, searchApply).then(() => { if (sOpen && document.activeElement !== sInput) sInput.focus({ preventScroll: true }); });
+  log("search", q ? `opened with “${q}”` : "opened");
+}
+function closeSearch() {
+  if (!sOpen && sP === 0) return Promise.resolve();
+  sOpen = false; sInput.blur(); if (state.mode === "search") state.mode = "home";
+  return spring("search", sP, 0, { response: 0.32, damping: 1 }, searchApply).then(() => { if (!sOpen) { $("#home").style.filter = ""; } });
+}
+window.__lab.openSearch = openSearch; window.__lab.closeSearch = closeSearch;
+
+const iconFor = r => {
+  const e = r.entity;
+  if (e.type === "app") { const a = appById(e.source); return `<div class="sic" style="background:${grad(a)};${a.dark ? "color:#e0457b" : ""}">${a.g}</div>`; }
+  const glyph = { note: "✎", setting: "⚙", notification: "●", action: "↯", contact: e.title[0] }[e.type] || "•";
+  return `<div class="sic" style="background:${grad(appById(e.source) || APPS[0])}">${glyph}</div>`;
+};
+function rowHTML(r, i, q) {
+  const e = r.entity, src = e.type === "app" ? "App" : (appById(e.source)?.name || "");
+  const why = r.why.filter(w => w !== "keyword").map(w => `<span class="why ${w}">${w === "provider" ? "live" : w}</span>`).join("");
+  const sub = e.body ? SE.highlight(e.body, q) : (e.keys && e.keys.length ? esc(e.keys.join(", ")) : TYPE_LABEL[e.type].replace(/s$/, ""));
+  return `<div class="srow" role="option" data-i="${i}" data-id="${esc(e.id)}"><div>${iconFor(r)}</div><div class="st">${SE.highlight(e.title, q)}</div><div class="src"><span>${esc(src)}</span>${why}</div><div class="ss">${sub}</div></div>`;
+}
+function runSearch() {
+  const q = sInput.value, seq = ++providerSeq;
+  if (!q.trim()) { renderEmpty(); inspect(null); return; }
+  const res = index.search(q), g = index.group(res.results, { labels: TYPE_LABEL }), qt = res.results[0]?.highlight || SE.tokens(q);
+  rows = []; let html = "";
+  const push = r => { rows.push(r); return rowHTML(r, rows.length - 1, qt); };
+  if (g.top) html += `<div class="sgroup tophit"><h4>Top Hit</h4><div class="slist glass">${push(g.top)}</div></div>`;
+  for (const sec of g.sections) html += `<div class="sgroup"><h4>${sec.label}<small>${sec.items.length}</small></h4><div class="slist glass">${sec.items.slice(0, 5).map(push).join("")}</div></div>`;
+  html += `<div class="sgroup" id="sProv"></div>`;
+  const ask = { entity: { id: "ask", type: "ask", title: `Ask about “${q.trim()}”`, body: "Hand this to the assistant", source: "settings" }, why: [] };
+  rows.push(ask);
+  html += `<div class="sgroup"><h4>Ask</h4><div class="slist glass"><div class="srow" role="option" data-i="${rows.length - 1}" data-id="ask"><div><div class="sic" style="background:conic-gradient(#ff7a59,#ffcf5a,#5affb0,#59b8ff,#b169ff,#ff7a59)">✦</div></div><div class="st">${esc(ask.entity.title)}</div><div class="src"></div><div class="ss">Hand this to the assistant</div></div></div></div>`;
+  if (!res.results.length) html = `<div class="sempty">No results on this device${indexing ? " yet. Indexing is still running." : "."}</div>` + html;
+  sRes.innerHTML = html; sel = 0; markSel();
+  setStatus(`${res.results.length} ${res.results.length === 1 ? "result" : "results"} in ${res.ms.toFixed(1)} ms`);
+  inspect(res);
+  index.searchProviders(q).then(list => {
+    if (seq !== providerSeq || !list.length) return;
+    const holder = $("#sProv"); if (!holder) return;
+    holder.innerHTML = `<h4>Contacts<small>live lookup</small></h4><div class="slist glass">${list.map(r => push({ ...r, highlight: qt })).join("")}</div>`;
+    log("provider", `Contacts returned ${list.length}`);
+  });
+}
+function renderEmpty() {
+  rows = [];
+  const rec = recents(), sugg = ["notes", "weather", "settings", "music"].map(appById);
+  sRes.innerHTML = `
+    ${rec.length ? `<div class="sgroup"><h4>Recent searches</h4><div class="chips">${rec.map(r => `<button class="glass" data-q="${esc(r)}">${esc(r)}</button>`).join("")}</div></div>` : ""}
+    <div class="sgroup"><h4>Suggested apps</h4><div class="chips">${sugg.map(a => `<button class="glass" data-app="${a.id}">${a.name}</button>`).join("")}</div></div>
+    <div class="sgroup"><h4>Try</h4><div class="chips">${["dentist", "wether", "night theme", "vacation", "ma"].map(t => `<button class="glass" data-q="${t}">${t}</button>`).join("")}</div></div>`;
+  setStatus();
+}
+function markSel() { sRes.querySelectorAll(".srow").forEach(el => el.classList.toggle("sel", +el.dataset.i === sel)); }
+function inspect(res) {
+  $("#iQuery").value = res ? `“${res.query}”` : "–"; $("#iMs").value = res ? res.ms.toFixed(2) + " ms" : "–";
+  $("#iCon").value = res && res.concepts.length ? res.concepts.join(", ") : "–";
+  $("#sTBody").innerHTML = res && res.results.length ? res.results.slice(0, 6).map(r => `<tr><td title="${esc(r.entity.title)}">${esc(r.entity.title)}</td><td>${r.ranks?.keyword ?? "–"}</td><td>${r.ranks?.meaning ?? "–"}</td><td>${r.ranks?.typo ?? "–"}</td><td>${r.score.toFixed(3)}</td></tr>`).join("")
+    : `<tr><td colspan="5" style="color:var(--muted)">${res ? "No indexed matches" : "Search for something to see how it ranks"}</td></tr>`;
+}
+function openAssistantWith(text) { closeSearch(); setTimeout(() => { openAssistant("search"); $("#askInput").value = text; }, 200); }
+async function activate(r) {
+  const e = r.entity; remember(sInput.value.trim()); log("search", `opened ${e.id}`);
+  if (e.type === "ask") { const q = sInput.value; await closeSearch(); openAssistant("search"); $("#answer").innerHTML = handleAsk(q); return; }
+  if (e.type === "action") { await closeSearch(); e.ref.run(); return; }
+  if (e.type === "notification") { await closeSearch(); panelTo(true); return; }
+  await closeSearch();
+  const icon = id => document.querySelector(`.icon[data-app="${id}"] .tile`);
+  if (e.type === "app") return openApp(e.source, icon(e.source));
+  if (e.type === "note") { await openApp("notes", icon("notes")); push(ITEMS.notes[e.ref]); return; }
+  if (e.type === "setting") {
+    if (e.ref.go === "panel") return panelTo(true);
+    if (e.ref.go === "reduce") { $("#tReduce").checked = !$("#tReduce").checked; log("setting", `Reduce motion ${$("#tReduce").checked ? "on" : "off"}`); return; }
+    return openApp("settings", icon("settings"));
+  }
+  if (e.type === "contact") return openApp("messages", icon("messages"));
+}
+sInput.addEventListener("input", runSearch);
+sInput.addEventListener("keydown", e => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); if (!rows.length) return; sel = (sel + (e.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length; markSel(); sRes.querySelector(".srow.sel")?.scrollIntoView({ block: "nearest" }); }
+  else if (e.key === "Enter" && rows[sel]) { e.preventDefault(); activate(rows[sel]); }
+  else if (e.key === "Escape") closeSearch();
+});
+sRes.addEventListener("click", e => {
+  const row = e.target.closest(".srow"); if (row) return activate(rows[+row.dataset.i]);
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.q) { sInput.value = b.dataset.q; runSearch(); sInput.focus(); }
+  if (b.dataset.app) { closeSearch().then(() => openApp(b.dataset.app, document.querySelector(`.icon[data-app="${b.dataset.app}"] .tile`))); }
+});
+$("#sCancel").addEventListener("click", () => closeSearch());
+$("#openSearch").addEventListener("click", () => openSearch());
+document.querySelectorAll(".box [data-q]").forEach(b => b.addEventListener("click", () => openSearch(b.dataset.q)));
+
+// Gesture: swipe down from the middle of the Home Screen reveals search; the reveal follows the finger.
+(() => {
+  const home = $("#home"); let st = null, tr = null, dragging = false;
+  home.addEventListener("pointerdown", e => {
+    if (state.mode !== "home") return; const p = local(e);
+    if (p.y < 100 || p.y > H - 130) return; // middle band only; the top edge belongs to the control panel, the dock to the dock
+    st = p; tr = tracker(); tr.add(p); dragging = false;
+  });
+  home.addEventListener("pointermove", e => {
+    if (!st) return; const p = local(e); tr.add(p); const dy = p.y - st.y;
+    if (!dragging && dy > 10 && Math.abs(dy) > Math.abs(p.x - st.x)) { dragging = true; home.setPointerCapture(e.pointerId); sEl.style.display = "flex"; }
+    if (dragging) searchApply(Math.max(0, dy > 140 ? 1 + rubber(dy - 140, 300) / 140 : dy / 140));
+  });
+  const end = e => {
+    if (!st) return; const was = dragging; st = null; dragging = false; if (!was) return;
+    const v = tr.velocity(), proj = sP * 140 + project(v.y), open = proj > 90;
+    readout("search swipe", `${v.y.toFixed(0)} px/s`, `${proj.toFixed(0)} px`, open ? "open search" : "cancel");
+    if (open) openSearch(undefined, v.y / 140); else spring("search", sP, 0, { response: 0.3, damping: 1, velocity: v.y / 140 }, searchApply);
+    suppressClick = true; setTimeout(() => suppressClick = false, 50);
+  };
+  let suppressClick = false;
+  home.addEventListener("click", e => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+  home.addEventListener("pointerup", end); home.addEventListener("pointercancel", end);
+})();
+buildIndex();
+
 /* ---------------- instruments wiring ---------------- */
 const bind = (id, out, fmt) => { const i = $("#" + id), o = $("#" + out); const f = () => o.value = fmt(+i.value); i.addEventListener("input", f); f(); };
 bind("tResp", "oResp", v => v.toFixed(2)); bind("tDamp", "oDamp", v => v.toFixed(2)); bind("tSlow", "oSlow", v => v + "×");
@@ -918,6 +1190,9 @@ const SRC = {
   macworld: ["macworld.com iOS 27 guide (search snippet)", "https://www.macworld.com/article/2986799/ios-27-features-compatiblity-siri-ai-updates.html"],
   wwdc18: ["WWDC18 session 803, Designing Fluid Interfaces", "https://developer.apple.com/videos/play/wwdc2018/803/"],
   decel: ["UIScrollView.DecelerationRate", "https://developer.apple.com/documentation/uikit/uiscrollview/decelerationrate"],
+  s240: ["WWDC26 session 240", "https://developer.apple.com/videos/play/wwdc2026/240/"],
+  s343: ["WWDC26 session 343", "https://developer.apple.com/videos/play/wwdc2026/343/"],
+  forum: ["Apple Developer Forums thread 835563", "https://developer.apple.com/forums/thread/835563"],
   spring: ["SwiftUI Animation.spring(response:dampingFraction:blendDuration:)", "https://developer.apple.com/documentation/swiftui/animation/spring(response:dampingfraction:blendduration:)"],
 };
 const link = k => `<a href="${SRC[k][1]}" target="_blank" rel="noopener">${SRC[k][0]}</a>`;
@@ -936,6 +1211,14 @@ const LEDGER = [
   ["Gesture release uses velocity projection", "C", `Projection with the scroll view's deceleration rate, presented in ${link("wwdc18")}; rate constant from ${link("decel")}`, "<code>project(v) = v/1000 · 0.998/(1−0.998)</code>. Home swipe, edge swipe, panel and cards all decide on the projected end point.", "Flick quickly over a short distance: it should still go home. Drag slowly a long way and pause: it should open the switcher."],
   ["Spring parameters: response and damping fraction", "C", `${link("spring")}`, "Every animation is a unit-mass spring with k = (2π/response)², c = 4π·ζ/response, integrated at 1 ms steps.", "<code>tests/test_spring_fit.py</code> shows the fitter recovers known springs. Fit real recordings the same way."],
   ["Reduce Motion replaces zooms with cross-fades", "C", "Long-standing accessibility behaviour (Settings › Accessibility › Motion). Not re-checked for iOS 27.", "The Reduce motion switch, or the OS preference, swaps launch and dismiss zooms for opacity fades.", "Turn on Reduce Motion and record an app launch."],
+  ["Search: entities enter a system semantic index", "A", `“…adopting IndexedEntity. When you do this, your app's entities are indexed into the system semantic index.” ${link("s240")}`, "Notes, apps, settings, notifications and actions are indexed as typed entities in <code>search-engine.js</code>.", "Index a test entity with <code>indexAppEntities</code> and search for it in Spotlight."],
+  ["Search: match by meaning, not just text", "A", `“This allows Siri to match based on meaning, not just text…” ${link("s240")}`, "A meaning ranker built from a concept lexicon. “dentist” finds a note about a cleaning appointment. This is a stand-in for a learned embedding model.", "Search Mail or Notes for a synonym that does not appear in the item."],
+  ["Search: indexingKey marks searchable properties", "A", `“The indexingKey tells Spotlight which properties, like the message body, should be searchable.” ${link("s240")}`, "Each entity declares <code>title</code>, <code>keys</code> and <code>body</code>, and each field is weighted (3, 1.5, 1).", "Index an entity with and without an <code>indexingKey</code> and compare what Spotlight returns."],
+  ["Search: keep the index current; reindex on request", "A", `“Index new entities as people add content… delete those index entries too.” Reindex via <code>IndexedEntityQuery</code>. ${link("s343")}`, "Index builds in the background with a progress line. “new note …” adds to it at once; <code>reindex()</code> rebuilds it.", "Add a note, then search for it at once; check the Indexing status after a fresh install."],
+  ["Search: content not indexed ahead of time", "A", `“With a string query, Siri hands you the person's input. Your app is responsible for finding matching entities…” ${link("s240")}`, "A Contacts provider is queried live on every keystroke; its results arrive later in their own section.", "Implement <code>EntityStringQuery</code> and log the strings Siri passes in."],
+  ["Search: app actions appear as results", "A", `“…that action can show up across the system in places like Shortcuts, Spotlight, Widgets, and more.” ${link("s240")}`, "Intents are indexed as Action results and run when you tap them.", "Define an <code>AppIntent</code> and look for it in Spotlight."],
+  ["Search and Siri merge into “Search or Ask”, swiped down from mid-screen", "B", "Search summary only; source page not fetched. Not stated in Apple developer sessions.", "Swipe down in the middle of the Home Screen. An “Ask” row at the bottom hands the query to the assistant.", "Swipe down on the Home Screen and record the transition."],
+  ["Search: Spotlight results are not always reachable from Siri", "D", `Forum report (iOS 27): entities appear in Spotlight but Siri answers from the web. Apple DTS: “Spotlight acts as a database.” ${link("forum")}`, "Not modelled. Search and the assistant share one index here.", "Ask Siri about an indexed but unschematized entity."],
   ["Rubber-band resistance past the edge", "D", "Constant 0.55 comes from community reverse engineering of UIScrollView, not Apple documentation.", "<code>rubber(x, d) = (1 − 1/(0.55·x/d + 1))·d</code> on the panel, the pill and switcher cards.", "Overscroll a list and plot finger position against content offset; fit c."],
   ["Interactive back with 30% parallax", "D", "Matches long-standing UINavigationController behaviour as observed. The 30% value is a measured approximation, not documented.", "Drag from the left edge of a detail page. The list underneath moves at 0.3× and dims.", "Record an edge swipe and compare the two pages' x offsets frame by frame."],
 ];
