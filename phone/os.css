@@ -1,7 +1,13 @@
+/* Inter (SIL Open Font License, fonts/OFL.txt), bundled so Android and Windows get a crisp neo-grotesque instead of Roboto or Segoe.
+   Apple devices keep their own system font through -apple-system. */
+@font-face { font-family: "Glassline Sans"; src: url("fonts/inter-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Glassline Sans"; src: url("fonts/inter-latin-ext-wght-normal.woff2") format("woff2"); font-weight: 100 900; font-display: swap;
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 /* Glassline OS. Original styles; iOS-like layout conventions, no Apple assets. */
 :root {
   --W: 393px; --H: 852px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font: -apple-system, "Glassline Sans", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --glass: .55;              /* 0 = clear, 1 = fully tinted; set by Settings and Control Centre */
   --accent: #0066cc;           /* DESIGN.md colors.primary; colors.primary-on-dark in .dark */
   --red: #ff453a; --green: #30d158; --orange: #ff9f0a; --yellow: #ffd60a; --purple: #bf5af2; --pink: #ff375f; --teal: #64d2ff;
@@ -448,3 +454,44 @@ body.app #screen, body.app .hw { -webkit-app-region: no-drag; }
 body.android #stage { display: block; }
 body.android #help { display: none; }
 body.android #frame { position: fixed; left: 0; top: 0; }
+
+/* Inter's single-storey a, straight-sided digits and tighter display tracking read closer to a phone system face */
+#screen { font-feature-settings: "cv11" 1, "ss03" 1, "cv05" 1; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+#screen h1, .nav h1, #lockClock, .widget .big { letter-spacing: -0.02em; }
+
+/* icons: glyphs sit slightly raised off their tile, like printed enamel */
+.icon svg { filter: drop-shadow(0 1px 1.2px rgba(0,0,0,.16)); }
+.icon.native { box-shadow: inset 0 0 0 .5px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.15); }
+
+/* Music transport: drawn glyphs sized like a phone's media controls */
+.win[data-app="music"] .ibtn svg { width: 34px; height: 34px; }
+.win[data-app="music"] button span svg { width: 16px; height: 16px; display: inline-block; vertical-align: -2px; }
+.win[data-app="music"] .ibtn.pp svg { width: 52px; height: 52px; }
+
+/* ---------- Store: editorial cards, shelves and charts ---------- */
+.st-date { color: var(--ink3); font-size: 13px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; margin-bottom: 6px; }
+.st-card { margin: 0 16px 22px; border-radius: 20px; overflow: hidden; background: var(--card); box-shadow: 0 12px 32px rgba(0,0,0,.12); cursor: pointer; transition: transform .2s; }
+.st-card:active { transform: scale(.97); }
+.st-art { position: relative; height: 250px; display: grid; place-items: center; overflow: hidden; }
+.st-art .icon { transform: rotate(-8deg); box-shadow: 0 24px 40px rgba(0,0,0,.28), inset 0 0 0 .5px rgba(255,255,255,.4); z-index: 1; }
+.st-blob { position: absolute; border-radius: 50%; background: rgba(255,255,255,.22); filter: blur(2px); }
+.st-ring { position: absolute; width: 70px; height: 70px; border-radius: 50%; border: 10px solid rgba(255,255,255,.25); }
+.st-text { padding: 16px 18px 18px; }
+.st-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--ink3); }
+.st-title { font-size: 26px; font-weight: 700; line-height: 1.12; letter-spacing: -0.02em; margin: 4px 0 6px; color: var(--ink); }
+.st-sub { font-size: 15px; line-height: 1.4; color: var(--ink3); margin-bottom: 14px; }
+.st-app, .st-mini { display: flex; align-items: center; gap: 12px; }
+.st-app { padding-top: 14px; border-top: .5px solid var(--sep); }
+.st-name { font-size: 16px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.2px; }
+.st-tag { font-size: 13px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-shelf { margin: 6px 0 22px; }
+.st-shelf-h { display: flex; justify-content: space-between; align-items: baseline; padding: 0 20px 10px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); border-top: .5px solid var(--sep); padding-top: 14px; margin: 0 0 0 0; }
+.st-shelf-h span { font-size: 16px; font-weight: 400; color: var(--accent); letter-spacing: 0; }
+.st-shelf-row { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 14px; padding: 0 20px; scrollbar-width: none; }
+.st-shelf-row::-webkit-scrollbar { display: none; }
+.st-col { flex: none; width: 310px; scroll-snap-align: start; display: flex; flex-direction: column; }
+.st-mini { padding: 9px 0; cursor: pointer; }
+.st-col .st-mini + .st-mini, .st-rank + .st-rank { border-top: .5px solid var(--sep); }
+.st-rank { margin: 0 20px; }
+.st-num { width: 18px; text-align: center; font-size: 17px; color: var(--ink); }
+.win[data-app="store"] .scroll { padding-bottom: 120px; }

@@ -32,14 +32,14 @@ function h(sel, props, ...kids) {
   return el;
 }
 
-/* ---------- glyphs: original line drawings on a 24 px grid ---------- */
+/* ---------- glyphs: original drawings on a 24 px grid ---------- */
 const G = {
   phone: '<path d="M6.6 3.5 9 3l1.6 4-2 1.4a11 11 0 0 0 7 7l1.4-2 4 1.6-.5 2.4a2 2 0 0 1-2 1.6C10.6 19 5 13.4 5 5.5a2 2 0 0 1 1.6-2z" fill="#fff" stroke="none"/>',
   message: '<path d="M12 4c5 0 9 3.1 9 7s-4 7-9 7c-1 0-2-.1-2.9-.4L5 19.5l1.2-3.4C4.2 14.8 3 13 3 11c0-3.9 4-7 9-7z" fill="#fff" stroke="none"/>',
   mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5" fill="#fff" stroke="none"/><path d="m4 7 8 6 8-6" stroke="#2e7cf6" stroke-width="1.6"/>',
   compass: '<circle cx="12" cy="12" r="9" stroke-width="1.4"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z" fill="#fff"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2" stroke-width="1.2"/>',
   camera: '<path d="M3.5 8h3.8l1.7-2.5h6l1.7 2.5h3.8v10.5h-17z" fill="#fff" stroke="none"/><circle cx="12" cy="13" r="3.6" fill="#555" stroke="#bbb" stroke-width="1.2"/>',
-  photos: '<g stroke="none" opacity=".92"><ellipse cx="12" cy="6.5" rx="2.6" ry="4" fill="#ffb02e"/><ellipse cx="12" cy="17.5" rx="2.6" ry="4" fill="#3d8bfd"/><ellipse cx="6.5" cy="12" rx="4" ry="2.6" fill="#33c46b"/><ellipse cx="17.5" cy="12" rx="4" ry="2.6" fill="#ff4d6d"/><ellipse cx="8.2" cy="8.2" rx="2.6" ry="4" fill="#c5e33a" transform="rotate(-45 8.2 8.2)"/><ellipse cx="15.8" cy="15.8" rx="2.6" ry="4" fill="#9b6bff" transform="rotate(-45 15.8 15.8)"/><ellipse cx="15.8" cy="8.2" rx="2.6" ry="4" fill="#ff7a3d" transform="rotate(45 15.8 8.2)"/><ellipse cx="8.2" cy="15.8" rx="2.6" ry="4" fill="#2bc5c5" transform="rotate(45 8.2 15.8)"/></g>',
+  photos: '<g stroke="none"><rect x="3.5" y="6" width="12" height="12" rx="2.4" fill="#ffb02e" transform="rotate(-12 9.5 12)"/><rect x="6" y="5" width="13" height="13" rx="2.6" fill="#ff4d6d" transform="rotate(6 12.5 11.5)"/><rect x="7.5" y="6.5" width="13" height="13" rx="2.6" fill="#3d8bfd"/><circle cx="16.6" cy="10.2" r="1.6" fill="#fff"/><path d="M7.5 17.3l4-4.3 3.2 3.2 1.7-1.6 4.1 3.4v.4a2.6 2.6 0 0 1-2.6 1.6h-7.8a2.6 2.6 0 0 1-2.6-2.6z" fill="#fff" opacity=".95"/></g>',
   clock: '<circle cx="12" cy="12" r="9" fill="#fff" stroke="none"/><path d="M12 6.5V12l3.5 2" stroke="#111" stroke-width="1.6"/><circle cx="12" cy="12" r="1" fill="#f60" stroke="none"/>',
   calendar: '<text x="12" y="9" text-anchor="middle" font-size="5" font-weight="700" fill="#ff3b30" stroke="none" font-family="system-ui">DAY</text><text x="12" y="20" text-anchor="middle" font-size="11" fill="#111" stroke="none" font-family="system-ui">1</text>',
   weather: '<circle cx="9" cy="9" r="3.6" fill="#ffd84a" stroke="none"/><path d="M7.5 19h9.5a3.5 3.5 0 0 0 .2-7 5 5 0 0 0-9.4 1.2A3 3 0 0 0 7.5 19z" fill="#fff" stroke="none"/>',
@@ -49,7 +49,7 @@ const G = {
   music: '<path d="M9.5 17.5V6.5l9-2v11" stroke-width="1.8"/><circle cx="7.5" cy="17.5" r="2.2" fill="#fff"/><circle cx="16.5" cy="15.5" r="2.2" fill="#fff"/>',
   calc: '<g stroke="none"><circle cx="7" cy="7" r="2.4" fill="#a5a5a5"/><circle cx="12" cy="7" r="2.4" fill="#a5a5a5"/><circle cx="17" cy="7" r="2.4" fill="#ff9f0a"/><circle cx="7" cy="12" r="2.4" fill="#555"/><circle cx="12" cy="12" r="2.4" fill="#555"/><circle cx="17" cy="12" r="2.4" fill="#ff9f0a"/><circle cx="7" cy="17" r="2.4" fill="#555"/><circle cx="12" cy="17" r="2.4" fill="#555"/><circle cx="17" cy="17" r="2.4" fill="#ff9f0a"/></g>',
   gear: '<circle cx="12" cy="12" r="3" stroke-width="1.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="12" r="6.4" stroke-width="1.6"/>',
-  store: '<path d="M8 17 12.8 7.5M16 17l-4.8-9.5M6.5 13.8h11" stroke-width="2" stroke-linecap="round"/>',
+  store: '<path d="M6.5 8.5h11l-.9 10.2a1.6 1.6 0 0 1-1.6 1.5H9a1.6 1.6 0 0 1-1.6-1.5z" fill="#fff" stroke="none"/><path d="M9.3 9.5V7.6a2.7 2.7 0 0 1 5.4 0v1.9" stroke-width="1.6" stroke-linecap="round"/><path d="M12 11.6l.7 1.5 1.6.2-1.2 1.1.3 1.6-1.4-.8-1.4.8.3-1.6-1.2-1.1 1.6-.2z" fill="#1a6dff" stroke="none"/>',
   folder: '<path d="M3 7a1.5 1.5 0 0 1 1.5-1.5h5L11 7.5h8.5A1.5 1.5 0 0 1 21 9v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" fill="#fff" stroke="none"/>',
   wave: '<path d="M4 12h1M7 9v6M10 6v12M13 8v8M16 10v4M19 11v2" stroke-width="2" stroke-linecap="round"/>',
   person: '<circle cx="12" cy="9" r="3.6" fill="#fff" stroke="none"/><path d="M5 19.5c1.2-3.4 4-5 7-5s5.8 1.6 7 5" fill="#fff" stroke="none"/>',
@@ -117,6 +117,7 @@ const SYS = { // small UI glyphs used by the shell (stroke = currentColor)
   sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke-linecap="round"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   external: '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" stroke-linecap="round" stroke-linejoin="round"/>',
   reload: '<path d="M19 12a7 7 0 1 1-2-5M19 4v4h-4" stroke-linecap="round" stroke-linejoin="round"/>',
+  shuffle: '<path d="M3 7h3.5c4.5 0 6.5 10 11 10H21M3 17h3.5c1.8 0 3.1-1.6 4.2-3.6M13.3 9.6C14.4 8 15.6 7 17.5 7H21M18.5 4.5 21 7l-2.5 2.5M18.5 14.5 21 17l-2.5 2.5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   pen: '<path d="M4 20h4L19 9l-4-4L4 16z" stroke-linejoin="round"/><path d="m13.5 6.5 4 4"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2" stroke-linecap="round"/>',
   scan: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/>',
@@ -348,13 +349,29 @@ const WIDGETS = {
     return h("div.widget.w-photo", { onclick: () => open("photos"), style: { backgroundImage: ph ? `url(${ph.src})` : WALLPAPERS[3].css } }, h("div.sm", "Featured Photo")); } },
   weatherWide: { name: "Weather (wide)", size: "wide", render: () => { const w = weatherNow();
     return h("div.widget.w-weather.w4", { onclick: () => open("weather") }, h("div", { style: { display: "flex", justifyContent: "space-between" } }, h("div", h("h4", w.city), h("div.big", w.temp + "°")), h("div.sm", { style: { textAlign: "right" } }, w.cond, h("br"), `H:${w.hi}° L:${w.lo}°`)),
-      h("div", { style: { display: "flex", justifyContent: "space-between", marginTop: "14px" } }, ...w.hours.slice(0, 6).map(x => h("div.sm", { style: { textAlign: "center" } }, x.h, h("br"), x.i, h("br"), x.t + "°")))); } },
+      h("div", { style: { display: "flex", justifyContent: "space-between", marginTop: "14px" } }, ...w.hours.slice(0, 6).map(x => h("div.sm", { style: { textAlign: "center" } }, x.h, h("div", { style: { margin: "4px 0" }, html: wxIcon(x.i, 20) }), x.t + "°")))); } },
 };
 function analogClock(size) {
   const d = new Date(), hA = (d.getHours() % 12 + d.getMinutes() / 60) * 30, mA = d.getMinutes() * 6, sA = d.getSeconds() * 6;
   const ticks = Array.from({ length: 12 }, (_, i) => `<text x="${50 + 38 * Math.sin(i * Math.PI / 6)}" y="${54 + -38 * Math.cos(i * Math.PI / 6)}" font-size="10" text-anchor="middle" fill="#111" font-family="system-ui">${i || 12}</text>`).join("");
   return `<svg viewBox="0 0 100 100" width="${size}" height="${size}">${ticks}<line x1="50" y1="50" x2="50" y2="26" stroke="#111" stroke-width="3.5" stroke-linecap="round" transform="rotate(${hA} 50 50)"/><line x1="50" y1="50" x2="50" y2="14" stroke="#111" stroke-width="2.5" stroke-linecap="round" transform="rotate(${mA} 50 50)"/><line x1="50" y1="58" x2="50" y2="12" stroke="#ff9f0a" stroke-width="1" transform="rotate(${sA} 50 50)"/><circle cx="50" cy="50" r="2.5" fill="#ff9f0a"/></svg>`;
 }
+
+/* ---------- weather icons: original multicolour drawings keyed by condition symbol ---------- */
+const WX_SUN = '<circle cx="12" cy="12" r="4.6" fill="#ffd23f"/><g stroke="#ffd23f" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.8v2.2M12 19v2.2M2.8 12h2.2M19 12h2.2M5.5 5.5l1.6 1.6M16.9 16.9l1.6 1.6M5.5 18.5l1.6-1.6M16.9 7.1l1.6-1.6"/></g>';
+const WX_CLOUD = (y = 0, c = "#fff") => `<path d="M7.2 ${19 + y}h10.3a3.9 3.9 0 0 0 .3-7.8 5.6 5.6 0 0 0-10.7 1.4 3.2 3.2 0 0 0 .1 6.4z" fill="${c}"/>`;
+const WX = {
+  "☀": WX_SUN,
+  "☾": '<path d="M19.5 14.6A7.6 7.6 0 0 1 9.4 4.5a7.6 7.6 0 1 0 10.1 10.1z" fill="#e9eef7"/>',
+  "⛅": '<g transform="translate(-2.5 -3) scale(.85)">' + WX_SUN + '</g>' + WX_CLOUD(1),
+  "☁": WX_CLOUD(-1, "#f2f5fa"),
+  "🌫": '<g stroke="#e3e8f0" stroke-width="1.9" stroke-linecap="round"><path d="M4 9h16M6 12.5h12M4 16h16M7 19.5h10"/></g>',
+  "🌧": WX_CLOUD(-4) + '<g stroke="#5ac8fa" stroke-width="1.8" stroke-linecap="round"><path d="M8.5 17.5l-1 3M12.5 17.5l-1 3M16.5 17.5l-1 3"/></g>',
+  "🌦": '<g transform="translate(-3 -4) scale(.8)">' + WX_SUN + '</g>' + WX_CLOUD(-3) + '<g stroke="#5ac8fa" stroke-width="1.8" stroke-linecap="round"><path d="M10 18.5l-.8 2.5M14 18.5l-.8 2.5"/></g>',
+  "❄": WX_CLOUD(-4) + '<g fill="#fff"><circle cx="8.5" cy="19" r="1.1"/><circle cx="12.5" cy="20.5" r="1.1"/><circle cx="16.5" cy="19" r="1.1"/></g>',
+  "⛈": WX_CLOUD(-4, "#c9d2e0") + '<path d="M12.8 15.5 10 19.8h2.4l-1 3.2 3.4-4.8h-2.5l.9-2.7z" fill="#ffd23f"/>',
+};
+function wxIcon(sym, size = 24) { return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="display:inline-block;vertical-align:middle;filter:drop-shadow(0 1px 1px rgba(0,0,0,.15))">${WX[sym] || WX["☀"]}</svg>`; }
 
 /* ---------- shared data the shell and apps both read ---------- */
 let weatherCache = saved.weather || null;
@@ -1831,7 +1848,7 @@ function start() {
 }
 
 window.GOS = {
-  W, get H() { return H; }, h, $, $$, sys, wake: () => wake(), svg, G, SYS, esc, clamp, lerp, sleep, spring, project, rubber, track, haptic, tone, SOUND,
+  wxIcon, W, get H() { return H; }, h, $, $$, sys, wake: () => wake(), svg, G, SYS, esc, clamp, lerp, sleep, spring, project, rubber, track, haptic, tone, SOUND,
   registerApp, apps, iconEl, open, goHome, closeApp, lock, unlockFlow, install, uninstall, isInstalled, placeApp,
   notify, toast, sheet, alert: alertBox, prompt: prompt_, share, ctxMenu, overlay, hud, torch: v => torch(v), get torchOn() { return torchOn; },
   settings: S, set, on, emit, appStore, media, battery, live, startTimer, stopTimer, timerState, recState, callState, fmtDur,

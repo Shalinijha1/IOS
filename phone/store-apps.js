@@ -261,13 +261,24 @@ O.registerApp({ id: "store", name: "Store", bg: "linear-gradient(#20b2ff,#1a6dff
     }
     const pages = [
       () => { const feat = catalog().filter(a => !a.builtin); const pick = feat[new Date().getDate() % Math.max(1, feat.length)];
-        const card = (label, title, a, bg) => h("div", { style: { margin: "0 16px 18px", borderRadius: "22px", overflow: "hidden", background: bg, color: "#fff", padding: "20px", minHeight: "300px", display: "flex", flexDirection: "column", boxShadow: "0 10px 30px rgba(0,0,0,.15)", cursor: "pointer" }, onclick: () => a && product(a) },
-          h("div", { style: { fontSize: "13px", fontWeight: 700, opacity: .8 } }, label), h("div", { style: { fontSize: "28px", fontWeight: 800, lineHeight: 1.1 } }, title), h("div", { style: { marginTop: "auto", display: "flex", alignItems: "center", gap: "10px", background: "rgba(255,255,255,.18)", borderRadius: "14px", padding: "8px" } }, a ? [O.iconEl(a, { size: 44 }), h("div", { style: { flex: 1 } }, h("b", a.name), h("div", { style: { fontSize: "12px", opacity: .85 } }, a.subtitle)), getBtn(a, true)] : null));
-        return { title: "Today", under: h("div.sub", { style: { color: "var(--ink3)", fontWeight: 600, textTransform: "uppercase" } }, new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })),
-          body: h("div", play() ? playCard() : null, pick ? card("APP OF THE DAY", pick.subtitle, pick, pick.bg) : null, card("GET STARTED", "Games to play in a spare minute", O.apps.bubbles, "linear-gradient(135deg,#0b486b,#1fa2ff)"), card("WELLBEING", "Small habits, big changes", O.apps.habits, "linear-gradient(135deg,#f5576c,#f093fb)"), h("div", { style: { height: "100px" } })) }; },
-      () => ({ title: "Games", body: h("div", h("div.list.flush", catalog().filter(a => a.category === "Games").map(appRow)), h("div", { style: { height: "100px" } })) }),
+        // editorial card: illustrated top (the app's own colours, its icon floating), story text and the app below
+        const card = (label, title, sub, a) => {
+          const art = h("div.st-art", { style: { background: a.bg } },
+            h("i.st-blob", { style: { left: "-40px", top: "-30px", width: "200px", height: "200px" } }), h("i.st-blob", { style: { right: "-50px", bottom: "-60px", width: "240px", height: "240px", opacity: .35 } }),
+            h("i.st-ring", { style: { right: "28px", top: "26px" } }), O.iconEl(a, { size: 132 }));
+          return h("div.st-card", { dataset: { entity: "story", title }, onclick: () => product(a) }, art,
+            h("div.st-text", h("div.st-eyebrow", label), h("div.st-title", title), h("div.st-sub", sub),
+              h("div.st-app", O.iconEl(a, { size: 44 }), h("div", { style: { flex: 1, minWidth: 0 } }, h("div.st-name", a.name), h("div.st-tag", a.subtitle || a.category)), getBtn(a))));
+        };
+        return { title: "Today", under: h("div.st-date", new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })),
+          body: h("div", play() ? playCard() : null,
+            pick ? card("APP OF THE DAY", pick.subtitle || pick.name, pick.desc || "", pick) : null,
+            O.apps.bubbles ? card("GET STARTED", "Games for a spare minute", "Quick rounds you can pause any time, built for one thumb.", O.apps.bubbles) : null,
+            O.apps.habits ? card("WELLBEING", "Small habits, big changes", "Tick off one thing a day and watch the streak build.", O.apps.habits) : null,
+            h("div", { style: { height: "120px" } })) }; },
+      () => ({ title: "Games", body: h("div", chart("Top Free Games", catalog().filter(a => a.category === "Games")), h("div", { style: { height: "120px" } })) }),
       () => { const cats = {}; catalog().filter(a => a.category !== "Games").forEach(a => (cats[a.category] = cats[a.category] || []).push(a));
-        return { title: "Apps", body: h("div", ...Object.entries(cats).map(([c, l]) => [T.hdr(c), h("div.list.flush", l.map(appRow))]), h("div", { style: { height: "100px" } })) }; },
+        return { title: "Apps", body: h("div", ...Object.entries(cats).map(([c, l]) => shelf(c, l)), chart("Top Free Apps", catalog().filter(a => a.category !== "Games").slice(0, 8)), h("div", { style: { height: "120px" } })) }; },
       () => { const res = h("div.list.flush"); const q = h("input", { placeholder: "Games, Apps and More", oninput: () => { const v = q.value.toLowerCase(); res.innerHTML = ""; catalog().filter(a => !v || (a.name + " " + (a.keywords || "") + " " + (a.subtitle || "")).toLowerCase().includes(v)).forEach(a => res.append(appRow(a))); if (play()) res.prepend(playRow(q.value)); } });
         setTimeout(() => q.dispatchEvent(new Event("input")), 0);
         return { title: "Search", body: h("div", h("div.searchbar", { html: sys("search") }, q), res, foot()) }; },
@@ -283,6 +294,17 @@ O.registerApp({ id: "store", name: "Store", bg: "linear-gradient(#20b2ff,#1a6dff
       return h("div", { style: { margin: "0 16px 18px", borderRadius: "22px", background: "var(--card)", padding: "18px", display: "flex", alignItems: "center", gap: "14px", cursor: "pointer" }, onclick: () => O.platform.playStore("") },
         h("div", { style: { flex: 1 } }, h("div", { style: { fontSize: "13px", fontWeight: 600, color: "var(--ink3)" } }, "YOUR PHONE'S APPS"), h("div", { style: { fontSize: "20px", fontWeight: 600, letterSpacing: "-0.374px" } }, "Get apps from Google Play"), h("div.sub", { style: { color: "var(--ink3)", fontSize: "14px" } }, "They appear on your Home Screen as soon as they install.")),
         h("button.pill-btn", { style: { minHeight: "32px" } }, "Open"));
+    }
+    // a horizontal shelf of apps, three to a column, like a store's category rows
+    function shelf(title, list) {
+      const cols = []; for (let i = 0; i < list.length; i += 3) cols.push(list.slice(i, i + 3));
+      return h("div.st-shelf", h("div.st-shelf-h", title, h("span", "See All")),
+        h("div.st-shelf-row", cols.map(col => h("div.st-col", col.map(a => h("div.st-mini", { dataset: { entity: "app", title: a.name }, onclick: () => product(a) },
+          O.iconEl(a, { size: 58 }), h("div", { style: { flex: 1, minWidth: 0 } }, h("div.st-name", a.name), h("div.st-tag", a.subtitle || a.category)), getBtn(a)))))));
+    }
+    function chart(title, list) {
+      return h("div.st-shelf", h("div.st-shelf-h", title), h("div", list.map((a, i) => h("div.st-mini.st-rank", { dataset: { entity: "app", title: a.name }, onclick: () => product(a) },
+        O.iconEl(a, { size: 58 }), h("b.st-num", i + 1), h("div", { style: { flex: 1, minWidth: 0 } }, h("div.st-name", a.name), h("div.st-tag", a.subtitle || a.category)), getBtn(a)))));
     }
     function foot() { return h("p.sub", { style: { padding: "16px", color: "var(--ink3)", fontSize: "12px" } }, (play() ? "Apps listed here are Glassline’s own. Real Android apps come from Google Play." : "Store apps are original web apps bundled with Glassline OS. Real iPhone apps can't run in a browser.")); }
     const tabs = T.tabbar([{ icon: "star", label: "Today" }, { icon: "rec", label: "Games" }, { icon: "grid", label: "Apps" }, { icon: "search", label: "Search" }], i => stack.replaceRoot(pages[i]), 0);
