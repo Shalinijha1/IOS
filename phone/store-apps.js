@@ -237,8 +237,8 @@ O.registerApp({ id: "store", name: "Store", bg: "linear-gradient(#20b2ff,#1a6dff
     const host = h("div", { style: { position: "absolute", inset: 0 } }); ctx.el.append(host);
     const stack = O.makeStack(host);
     const catalog = () => Object.values(O.apps).filter(a => !a.builtin || (O.saved.removed || []).includes(a.id));
-    const getBtn = a => {
-      const b = h("button.pill-btn" + (O.isInstalled(a.id) ? ".grey" : ".grey"), { style: { minWidth: "72px", fontSize: "14px" }, onclick: async e => {
+    const getBtn = (a, onColor = false) => {
+      const b = h("button.pill-btn.grey", { "aria-label": (O.isInstalled(a.id) ? "Open " : "Get ") + a.name, style: { minWidth: "72px", minHeight: "32px", fontSize: "14px", background: onColor ? "#fff" : "" }, onclick: async e => {
         e.stopPropagation();
         if (O.isInstalled(a.id) && !O.installing) return O.open(a.id);
         if (O.isInstalled(a.id)) return O.open(a.id);
@@ -262,7 +262,7 @@ O.registerApp({ id: "store", name: "Store", bg: "linear-gradient(#20b2ff,#1a6dff
     const pages = [
       () => { const feat = catalog().filter(a => !a.builtin); const pick = feat[new Date().getDate() % Math.max(1, feat.length)];
         const card = (label, title, a, bg) => h("div", { style: { margin: "0 16px 18px", borderRadius: "22px", overflow: "hidden", background: bg, color: "#fff", padding: "20px", minHeight: "300px", display: "flex", flexDirection: "column", boxShadow: "0 10px 30px rgba(0,0,0,.15)", cursor: "pointer" }, onclick: () => a && product(a) },
-          h("div", { style: { fontSize: "13px", fontWeight: 700, opacity: .8 } }, label), h("div", { style: { fontSize: "28px", fontWeight: 800, lineHeight: 1.1 } }, title), h("div", { style: { marginTop: "auto", display: "flex", alignItems: "center", gap: "10px", background: "rgba(255,255,255,.18)", borderRadius: "14px", padding: "8px" } }, a ? [O.iconEl(a, { size: 44 }), h("div", { style: { flex: 1 } }, h("b", a.name), h("div", { style: { fontSize: "12px", opacity: .85 } }, a.subtitle)), getBtn(a)] : null));
+          h("div", { style: { fontSize: "13px", fontWeight: 700, opacity: .8 } }, label), h("div", { style: { fontSize: "28px", fontWeight: 800, lineHeight: 1.1 } }, title), h("div", { style: { marginTop: "auto", display: "flex", alignItems: "center", gap: "10px", background: "rgba(255,255,255,.18)", borderRadius: "14px", padding: "8px" } }, a ? [O.iconEl(a, { size: 44 }), h("div", { style: { flex: 1 } }, h("b", a.name), h("div", { style: { fontSize: "12px", opacity: .85 } }, a.subtitle)), getBtn(a, true)] : null));
         return { title: "Today", under: h("div.sub", { style: { color: "var(--ink3)", fontWeight: 600, textTransform: "uppercase" } }, new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })),
           body: h("div", pick ? card("APP OF THE DAY", pick.subtitle, pick, pick.bg) : null, card("GET STARTED", "Games to play in a spare minute", O.apps.bubbles, "linear-gradient(135deg,#0b486b,#1fa2ff)"), card("WELLBEING", "Small habits, big changes", O.apps.habits, "linear-gradient(135deg,#f5576c,#f093fb)"), h("div", { style: { height: "100px" } })) }; },
       () => ({ title: "Games", body: h("div", h("div.list.flush", catalog().filter(a => a.category === "Games").map(appRow)), h("div", { style: { height: "100px" } })) }),

@@ -110,6 +110,13 @@ const SYS = { // small UI glyphs used by the shell (stroke = currentColor)
   home: '<path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/>',
   hotspot: '<circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M8 8a5.5 5.5 0 0 0 0 8M16 8a5.5 5.5 0 0 1 0 8M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14" stroke-linecap="round"/>',
   star: '<path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z"/>',
+  fwd: '<path d="m9 4 8 8-8 8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  reply: '<path d="M10 6 4 12l6 6M4 12h10a6 6 0 0 1 6 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" stroke-width="1.8" stroke-linejoin="round"/>',
+  heartFill: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" fill="currentColor" stroke="none"/>',
+  sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke-linecap="round"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  external: '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" stroke-linecap="round" stroke-linejoin="round"/>',
+  reload: '<path d="M19 12a7 7 0 1 1-2-5M19 4v4h-4" stroke-linecap="round" stroke-linejoin="round"/>',
   pen: '<path d="M4 20h4L19 9l-4-4L4 16z" stroke-linejoin="round"/><path d="m13.5 6.5 4 4"/>',
   scan: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/>',
 };
@@ -436,7 +443,7 @@ function todayPage() {
     h("div.today-search.glass", { onclick: () => openSpotlight() }, h("span", { html: sys("search") , style: { width: "18px" } }), "Search"),
     h("div.today-date", d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })),
     h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" } }, L.map(k => { const w = WIDGETS[k]; const el = w.render(); if (w.size === "wide") el.style.gridColumn = "span 2"; return el; })),
-    h("button.glass", { style: { alignSelf: "center", padding: "6px 16px", borderRadius: "16px", fontSize: "14px", color: "var(--tint-ink)" }, onclick: () => widgetGallery(true) }, "Edit"));
+    h("button.glass", { style: { alignSelf: "center", minHeight: "44px", padding: "0 22px", borderRadius: "22px", fontSize: "15px", fontWeight: 600, color: "var(--tint-ink)" }, onclick: () => widgetGallery(true) }, "Edit Widgets"));
 }
 const LIB_CATS = [["Suggestions", null], ["Recently Added", null], ["Social", "Social"], ["Utilities", "Utilities"], ["Productivity & Finance", "Productivity"], ["Creativity", "Creativity"], ["Entertainment", "Entertainment"], ["Information & Reading", "Information"], ["Health & Fitness", "Health"], ["Games", "Games"]];
 function libraryPage() {
@@ -1122,7 +1129,7 @@ function renderNC() {
   for (const [app, g] of groups) {
     const expanded = expandedGroups.has(app) || g.length === 1;
     if (expanded) g.forEach(n => list.append(ntfEl(n)));
-    else { const el = ntfEl(g[0]); el.classList.add("stack"); el.querySelector(".m").textContent = g[0].body + (g.length > 1 ? `  (+${g.length - 1} more)` : "");
+    else { const el = ntfEl(g[0]); el.classList.add("grouped"); el.querySelector(".b").append(h("div.more", `${g.length - 1} more notification${g.length > 2 ? "s" : ""}`));
       el.addEventListener("click", ev => { ev.stopPropagation(); expandedGroups.add(app); renderNC(); }, { capture: true }); list.append(el); }
   }
 }
@@ -1413,7 +1420,7 @@ function renderSpotlight() {
       const s = icon.querySelector("svg"); if (s && !(e.id || "").startsWith("app:")) { s.style.color = "#fff"; s.style.width = "20px"; s.style.height = "20px"; }
       const hl = t => window.GlasslineSearch.highlight(t, r.highlight);
       box.append(h("div.sp-row", { dataset: { i }, onclick: () => runResult(e, q) }, icon, h("div", { style: { minWidth: 0, flex: 1 } }, h("div.t", { html: hl(e.title) }), h("div.s", { html: hl(e.subtitle || "") })),
-        e.type === "store" ? h("button.pill-btn.grey", { style: { padding: "4px 12px", fontSize: "13px" }, onclick: ev => { ev.stopPropagation(); install(e.id.slice(4)); toast("Installing " + e.title); } }, "Get") : h("span.sp-why", (r.why || []).join(" + "))));
+        e.type === "store" ? h("button.pill-btn.grey", { style: { padding: "4px 12px", fontSize: "13px" }, onclick: ev => { ev.stopPropagation(); install(e.id.slice(4)); toast("Installing " + e.title); } }, "Get") : null));
     });
     body.append(h("div.sp-sec", h("h5", label), box));
   }

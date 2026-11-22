@@ -22,6 +22,8 @@ function row({ icon, color, title, sub, val, go, tog, onclick, entity, cls = "" 
   return r;
 }
 const list = (...rows) => h("div.list", rows);
+/* icon-only button: SVG glyph, accessible name, 44x44 target */
+function iconBtn(glyph, label, onclick, color = "var(--accent)") { return h("button.ibtn", { title: label, "aria-label": label, onclick, style: { color }, html: sys(glyph) }); }
 const hdr = t => h("div.list-h", t);
 const foot = t => h("div.list-f", t);
 function tabbar(tabs, select, initial = 0) {
@@ -31,7 +33,7 @@ function tabbar(tabs, select, initial = 0) {
   return bar;
 }
 function minimizeOnScroll(scroller, bar) { let last = 0; scroller.addEventListener("scroll", () => { const y = scroller.scrollTop; if (y > last + 8 && y > 80) bar.classList.add("min"); else if (y < last - 8) bar.classList.remove("min"); last = y; }); }
-function plusBtn(fn, glyph = "plus") { return h("button.tbtn.circ.glass", { html: sys(glyph), onclick: fn, style: { color: "var(--accent)" } }); }
+function plusBtn(fn, glyph = "plus", label) { label = label || (glyph === "pen" ? "Compose" : "Add"); return h("button.tbtn.circ.glass", { title: label, "aria-label": label, html: sys(glyph), onclick: fn, style: { color: "var(--accent)" } }); }
 const ICON = (bg, glyph) => ({ bg, glyph });
 const avatarColor = n => ["#ff9f0a", "#30d158", "#64d2ff", "#bf5af2", "#ff375f", "#5e5ce6", "#ffd60a"][[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % 7];
 const avatar = (n, s = 40) => h("div", { style: { width: s + "px", height: s + "px", borderRadius: "50%", background: `linear-gradient(${avatarColor(n)}, #8e8e93)`, color: "#fff", display: "grid", placeItems: "center", fontWeight: 600, fontSize: s * .4 + "px", flex: "none" } }, n.split(" ").map(x => x[0]).join("").slice(0, 2));
@@ -126,6 +128,7 @@ const REPLIES = ["Sounds good!", "Haha 😄", "On my way", "Sure, see you then",
 const SEEDS = {
   notes: ["notes", () => [{ id: "n1", text: "Groceries\nmilk, eggs, bread, coffee, apples", t: Date.now() - 3600e3, pinned: true }, { id: "n2", text: "Dinner ideas\nRisotto on Friday with Mia and Leo. Try the new pasta place downtown at 7pm.", t: Date.now() - 86400e3 }]],
   reminders: ["items", () => [{ id: "r1", text: "Call the dentist", done: false }, { id: "r2", text: "Buy birthday card for Ava", done: false, flag: true }, { id: "r3", text: "Pay electricity bill", done: true }]],
+  calendar: ["events", () => [{ id: "e1", title: "Team stand-up", date: today(), time: "09:30" }, { id: "e2", title: "Dinner with Mia", date: today(), time: "19:00" }]],
   messages: ["threads", () => ({ "Mia Chen": [{ me: false, text: "Hey! Are you free this weekend?", t: Date.now() - 7200e3 }, { me: true, text: "Yes! What did you have in mind?", t: Date.now() - 7100e3 }], "Leo Park": [{ me: false, text: "The hike was amazing", t: Date.now() - 86400e3 }] })],
 };
 for (const [app, [key, make]] of Object.entries(SEEDS)) { const st = O.appStore(app); if (st.get(key, null) == null) st.set(key, make()); }
@@ -258,7 +261,7 @@ O.registerApp({ id: "mail", name: "Mail", bg: "linear-gradient(#5ac8fa,#1a73e8)"
     function read(x) {
       const all = box(); const me = all.find(y => y.id === x.id); me.read = true; save(all);
       const sum = h("div", { style: { display: "none", background: "var(--fill)", borderRadius: "12px", padding: "10px 12px", margin: "12px 0", fontSize: "14px" } });
-      stack.push(() => ({ title: "", large: false, right: h("div.grp", h("button.btn", { onclick: () => { const a = box(); a.find(y => y.id === x.id).box = "trash"; save(a); stack.pop(); } }, "🗑"), h("button.btn", { onclick: () => compose("Re: " + x.subject, x.from) }, "↩")),
+      stack.push(() => ({ title: "", large: false, right: h("div.grp", iconBtn("trash", "Move to Trash", () => { const a = box(); a.find(y => y.id === x.id).box = "trash"; save(a); stack.pop(); }), iconBtn("reply", "Reply", () => compose("Re: " + x.subject, x.from))),
         body: h("div", { style: { padding: "0 16px" } }, h("h2", { style: { margin: "4px 0" } }, x.subject), h("div.sub", `From ${x.from} · ${new Date(x.t).toLocaleString()}`),
           h("button.pill-btn.grey", { style: { marginTop: "10px", fontSize: "13px" }, onclick: () => { sum.style.display = "block"; sum.innerHTML = "<b>✦ Summary</b><br>" + esc(summarizeText(x.body)); } }, "✦ Summarize"), sum,
           h("p", { style: { fontSize: "16px", lineHeight: 1.5 } }, x.body)) }));
@@ -292,15 +295,15 @@ O.registerApp({ id: "browser", name: "Browser", bg: "linear-gradient(#fff,#e5ecf
     const frame = h("iframe", { style: { flex: 1, border: 0, width: "100%", background: "#fff", display: "none" }, sandbox: "allow-scripts allow-same-origin allow-forms allow-popups", referrerpolicy: "no-referrer" });
     const start = h("div.scroll", { style: { padding: "70px 18px 120px" } });
     const drawStart = () => { start.innerHTML = ""; start.append(h("h2", "Favorites"), h("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "14px" } }, favs.map(([n, u]) => h("div", { style: { textAlign: "center", fontSize: "12px", cursor: "pointer" }, dataset: { entity: "bookmark", title: n }, onclick: () => go(u) }, h("div", { style: { width: "60px", height: "60px", margin: "0 auto 6px", borderRadius: "14px", background: "var(--card)", display: "grid", placeItems: "center", fontSize: "26px", fontWeight: 700, color: avatarColor(n) } }, n[0]), n))),
-      h("h2", { style: { marginTop: "26px" } }, "Reading List"), list(...st.get("reading", []).map(u => row({ title: u, onclick: () => go(u) }))), h("p.sub", { style: { fontSize: "12px", color: "var(--ink3)" } }, "Many sites refuse to load inside another page. When that happens, use ⤴ to open the page in a real browser tab.")); };
+      h("h2", { style: { marginTop: "26px" } }, "Reading List"), list(...st.get("reading", []).map(u => row({ title: u, onclick: () => go(u) }))), h("p.sub", { style: { fontSize: "12px", color: "var(--ink3)" } }, "Many sites refuse to load inside another page. When that happens, use the Open in a browser tab button below to open it in a real tab.")); };
     drawStart();
     const addr = h("input", { placeholder: "Search or enter website", style: { flex: 1, border: 0, outline: 0, background: "none", fontSize: "16px", textAlign: "center" }, onkeydown: e => { if (e.key === "Enter") { go(addr.value); addr.blur(); } }, onfocus: () => { addr.style.textAlign = "left"; addr.select(); }, onblur: () => addr.style.textAlign = "center" });
     const bar = h("div", { style: { flex: "none", padding: "8px 10px 30px", display: "flex", flexDirection: "column", gap: "8px", background: "var(--bg)" } },
-      h("div.glass", { style: { display: "flex", alignItems: "center", height: "44px", borderRadius: "22px", padding: "0 14px", gap: "6px" } }, h("span", { html: sys("search"), style: { width: "16px", opacity: .5 } }), addr, h("button", { onclick: () => hi >= 0 && load(hist[hi]), style: { fontSize: "16px" } }, "↻")),
-      h("div", { style: { display: "flex", justifyContent: "space-around", color: "var(--accent)", fontSize: "22px" } },
-        h("button", { onclick: () => { if (hi > 0) load(hist[--hi]); else home(); } }, "‹"), h("button", { onclick: () => { if (hi < hist.length - 1) load(hist[++hi]); } }, "›"),
-        h("button", { onclick: () => O.share({ title: "Share page", url: hist[hi] || "" }) }, "⤴"), h("button", { onclick: () => { if (hist[hi]) { const r = st.get("reading", []); r.unshift(hist[hi]); st.set("reading", [...new Set(r)].slice(0, 20)); O.toast("Added to Reading List"); } } }, "☆"),
-        h("button", { onclick: () => hist[hi] && window.open(hist[hi], "_blank", "noopener") }, "⧉"), h("button", { onclick: home }, "⌂")));
+      h("div.glass", { style: { display: "flex", alignItems: "center", height: "44px", borderRadius: "22px", padding: "0 14px", gap: "6px" } }, h("span", { html: sys("search"), style: { width: "16px", opacity: .5 } }), addr, iconBtn("reload", "Reload", () => hi >= 0 && load(hist[hi]))),
+      h("div", { style: { display: "flex", justifyContent: "space-around" } },
+        iconBtn("back", "Back", () => { if (hi > 0) load(hist[--hi]); else home(); }), iconBtn("fwd", "Forward", () => { if (hi < hist.length - 1) load(hist[++hi]); }),
+        iconBtn("share", "Share", () => O.share({ title: "Share page", url: hist[hi] || "" })), iconBtn("star", "Add to Reading List", () => { if (!hist[hi]) return O.toast("Open a page first"); const r = st.get("reading", []); r.unshift(hist[hi]); st.set("reading", [...new Set(r)].slice(0, 20)); O.toast("Added to Reading List"); }),
+        iconBtn("external", "Open in a browser tab", () => hist[hi] ? window.open(hist[hi], "_blank", "noopener") : O.toast("Open a page first")), iconBtn("home", "Start Page", home)));
     ctx.el.append(start, frame, bar);
     function go(input) {
       let u = String(input).trim(); if (!u) return;
@@ -338,7 +341,7 @@ O.registerApp({ id: "camera", name: "Camera", bg: "linear-gradient(#e5e5ea,#8e8e
       stopCam(); msg.textContent = "Starting camera…";
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = "No camera API here. Open the page from http://localhost or https to use your webcam."; return; }
       try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 } }, audio: false }); video.srcObject = stream; msg.textContent = ""; video.style.transform = facing === "user" ? "scaleX(-1)" : ""; }
-      catch (e) { msg.textContent = "Camera unavailable: " + (e.name === "NotAllowedError" ? "permission denied. Allow camera access in your browser." : e.message); }
+      catch (e) { msg.textContent = e.name === "NotAllowedError" ? "Camera access is off. Allow it in your browser's site settings, then reopen Camera." : e.name === "NotFoundError" ? "No camera found. Connect a camera, then reopen Camera." : "The camera couldn't start. Close other apps using it, then reopen Camera."; }
     }
     function stopCam() { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null; }
     function frameData() {
@@ -422,18 +425,18 @@ O.registerApp({ id: "photos", name: "Photos", bg: "#fff", glyph: "photos", categ
       const vid = h("video", { controls: true, playsInline: true, style: { position: "absolute", inset: "100px 0", width: "100%", display: "none" } });
       const stage = h("div", { style: { position: "relative", flex: 1, background: "var(--bg)", overflow: "hidden", touchAction: "none" } }, img, vid);
       const info = h("div.sub", { style: { textAlign: "center" } });
-      const favB = h("button", { onclick: () => { const all = st.get("items", []); const x = all.find(y => y.id === p().id); x.fav = !x.fav; p().fav = x.fav; st.set("items", all); show(); } });
-      const show = () => { const x = p(); img.style.backgroundImage = `url(${x.src})`; info.textContent = new Date(x.t).toLocaleString(); favB.textContent = x.fav ? "♥" : "♡";
+      const favB = h("button.ibtn", { style: { color: "var(--accent)" }, onclick: () => { const all = st.get("items", []); const x = all.find(y => y.id === p().id); x.fav = !x.fav; p().fav = x.fav; st.set("items", all); show(); } });
+      const show = () => { const x = p(); img.style.backgroundImage = `url(${x.src})`; info.textContent = new Date(x.t).toLocaleString(); favB.innerHTML = sys(x.fav ? "heartFill" : "heart"); favB.setAttribute("aria-label", x.fav ? "Unfavorite" : "Favorite"); favB.title = favB.getAttribute("aria-label");
         if (sessionVideos[x.id]) { vid.src = sessionVideos[x.id]; vid.style.display = "block"; } else { vid.style.display = "none"; } };
       stage.addEventListener("pointerdown", e => track(e, { move(dx) { img.style.transition = "none"; img.style.transform = `translateX(${dx}px)`; }, end(dx, dy, vx, vy, info) {
         img.style.transition = ""; img.style.transform = "";
         if (!info.moved) { img.style.backgroundSize = img.style.backgroundSize === "cover" ? "contain" : "cover"; return; }
         if (dy > 140) return stack.pop();
         const pr = dx + project(vx, .99); if (pr < -120 && idx < arr.length - 1) idx++; else if (pr > 120 && idx > 0) idx--; show(); } }));
-      const tools = h("div.glass", { style: { display: "flex", justifyContent: "space-around", padding: "12px 0 30px", fontSize: "22px", color: "var(--accent)" } },
-        h("button", { onclick: () => O.share({ title: "Photo", image: p().src, text: "Photo" }) }, "⤴"), favB,
-        h("button", { onclick: () => edit(p(), show) }, "⚙︎"),
-        h("button", { onclick: () => O.alert({ title: "Delete Photo?", message: "This photo will be deleted from this device.", buttons: [{ label: "Cancel" }, { label: "Delete", red: true, run: () => { st.set("items", st.get("items", []).filter(y => y.id !== p().id)); arr.splice(idx, 1); if (!arr.length) return stack.pop(); idx = Math.min(idx, arr.length - 1); show(); } }] }) }, "🗑"));
+      const tools = h("div.glass", { style: { display: "flex", justifyContent: "space-around", padding: "8px 0 26px" } },
+        iconBtn("share", "Share", () => O.share({ title: "Photo", image: p().src, text: "Photo" })), favB,
+        iconBtn("sliders", "Edit", () => edit(p(), show)),
+        iconBtn("trash", "Delete", () => O.alert({ title: "Delete Photo?", message: "This photo will be deleted from this device.", buttons: [{ label: "Cancel" }, { label: "Delete", red: true, run: () => { st.set("items", st.get("items", []).filter(y => y.id !== p().id)); arr.splice(idx, 1); if (!arr.length) return stack.pop(); idx = Math.min(idx, arr.length - 1); show(); } }] })));
       stack.push(() => ({ title: "", large: false, under: info, body: h("div", { style: { display: "flex", flexDirection: "column", height: "100%" } }, stage), after: tools }));
       show();
     }
@@ -463,10 +466,10 @@ O.registerApp({ id: "clock", name: "Clock", bg: "#111", glyph: () => O.svg(`<cir
       () => { const b = h("div"); const draw = () => { b.innerHTML = ""; zones().forEach(z => { let t = ""; try { t = new Date().toLocaleTimeString([], { timeZone: z, hour: "2-digit", minute: "2-digit" }); } catch { t = "--"; }
           b.append(h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: ".5px solid #333" } }, h("div", h("div.sub", { style: { color: "#999" } }, "Today"), h("div", { style: { fontSize: "22px" } }, z.split("/").pop().replace(/_/g, " "))), h("div", { style: { fontSize: "46px", fontWeight: 200 } }, t))); }); };
         draw(); const iv = setInterval(draw, 15000); b.cleanup = () => clearInterval(iv);
-        return { title: "World Clock", right: h("button.btn", { onclick: () => O.prompt("Add a city (time zone)", "Australia/Sydney").then(v => { if (v) { try { new Date().toLocaleTimeString([], { timeZone: v }); st.set("zones", [...zones(), v]); draw(); } catch { O.toast("Unknown time zone"); } } }) }, "+"), b }; },
+        return { title: "World Clock", right: h("button.ibtn", { title: "Add City", "aria-label": "Add City", style: { color: "#ff9f0a" }, html: sys("plus"), onclick: () => O.prompt("Add a city (time zone)", "Australia/Sydney").then(v => { if (v) { try { new Date().toLocaleTimeString([], { timeZone: v }); st.set("zones", [...zones(), v]); draw(); } catch { O.toast("Unknown time zone"); } } }) }), b }; },
       () => { const b = h("div"); const draw = () => { b.innerHTML = ""; alarms().forEach(a => { const r = h("div", { dataset: { entity: "alarm", title: a.time }, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: ".5px solid #333", opacity: a.on ? 1 : .55 } },
           h("div", { onclick: () => O.sheet({ title: a.time, actions: [{ label: "Delete Alarm", red: true, run: () => { st.set("alarms", alarms().filter(x => x.id !== a.id)); draw(); } }] }) }, h("div", { style: { fontSize: "52px", fontWeight: 200 } }, a.time), h("div", a.label)), toggle(a.on, v => { const l = alarms(); l.find(x => x.id === a.id).on = v; st.set("alarms", l); draw(); })); b.append(r); }); };
-        draw(); return { title: "Alarms", right: h("button.btn", { onclick: () => O.prompt("New alarm (HH:MM, 24-hour)", "07:30").then(v => { if (v && /^\d{1,2}:\d{2}$/.test(v)) { st.set("alarms", [...alarms(), { id: uid(), time: v.padStart(5, "0"), on: true, label: "Alarm" }]); draw(); } }) }, "+"), b }; },
+        draw(); return { title: "Alarms", right: h("button.ibtn", { title: "Add Alarm", "aria-label": "Add Alarm", style: { color: "#ff9f0a" }, html: sys("plus"), onclick: () => O.prompt("New alarm (HH:MM, 24-hour)", "07:30").then(v => { if (v && /^\d{1,2}:\d{2}$/.test(v)) { st.set("alarms", [...alarms(), { id: uid(), time: v.padStart(5, "0"), on: true, label: "Alarm" }]); draw(); } }) }), b }; },
       () => { const disp = h("div", { style: { fontSize: "78px", fontWeight: 200, textAlign: "center", marginTop: "60px", fontVariantNumeric: "tabular-nums" } });
         const lapL = h("div", { style: { marginTop: "30px" } });
         const btn = (l, bg, fn) => h("button", { style: { width: "84px", height: "84px", borderRadius: "50%", background: bg, fontSize: "17px", boxShadow: "0 0 0 3px #000, 0 0 0 5px " + bg }, onclick: fn }, l);
@@ -522,7 +525,7 @@ O.registerApp({ id: "calendar", name: "Calendar", bg: "#fff", glyph: () => O.svg
       body.innerHTML = "";
       const y = view.getFullYear(), m = view.getMonth(); const first = (new Date(y, m, 1).getDay() + 6) % 7, days = new Date(y, m + 1, 0).getDate();
       const all = evs();
-      body.append(h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px 8px" } }, h("button.btn", { onclick: () => { view.setMonth(m - 1); draw(); } }, "‹"), h("b", { style: { fontSize: "20px", color: "var(--red)" } }, view.toLocaleDateString(undefined, { month: "long", year: "numeric" })), h("button.btn", { onclick: () => { view.setMonth(m + 1); draw(); } }, "›")));
+      body.append(h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px 8px" } }, iconBtn("back", "Previous Month", () => { view.setMonth(m - 1); draw(); }), h("b", { style: { fontSize: "20px", color: "var(--red)" } }, view.toLocaleDateString(undefined, { month: "long", year: "numeric" })), iconBtn("fwd", "Next Month", () => { view.setMonth(m + 1); draw(); })));
       const grid = h("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", textAlign: "center", padding: "0 8px", rowGap: "4px" } }, ..."MTWTFSS".split("").map(d => h("div.sub", { style: { color: "var(--ink3)", fontSize: "11px" } }, d)));
       for (let i = 0; i < first; i++) grid.append(h("div"));
       for (let d = 1; d <= days; d++) { const ds = `${y}-${pad2(m + 1)}-${pad2(d)}`; const isT = ds === today(), isS = ds === sel; const has = all.some(e => e.date === ds);
@@ -588,22 +591,28 @@ O.registerApp({ id: "weather", name: "Weather", bg: "linear-gradient(#4aa3ff,#1e
 O.registerApp({ id: "maps", name: "Maps", bg: "linear-gradient(#8ee27c,#4cb3ff)", glyph: "map", category: "Information", keywords: "directions navigation location",
   render(ctx) {
     const st = ctx.store;
-    const fr = h("iframe", { style: { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "#e8e4da" }, referrerpolicy: "no-referrer" });
+    const fr = h("iframe", { title: "Map", style: { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, background: "#e8e4da" }, referrerpolicy: "no-referrer" });
+    const offline = h("div", { style: { position: "absolute", inset: "0 0 160px", display: "none", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", textAlign: "center", padding: "0 40px", color: "var(--ink2)", background: "var(--bg)" } },
+      h("div", { style: { width: "56px", height: "56px", color: "var(--ink3)" }, html: O.svg(O.SYS.wifi) }), h("b", { style: { fontSize: "20px", color: "var(--ink)" } }, "Maps Needs the Internet"), h("div", "The map and place search load from OpenStreetMap. Connect to the internet and try again."),
+      h("button.pill-btn", { style: { marginTop: "6px", minHeight: "44px", padding: "0 22px" }, onclick: () => { const [la, lo] = st.get("view", [51.5072, -0.1276]); setView(la, lo); } }, "Try Again"));
+    // the iframe can't report failures across origins, so probe the map server directly
+    const checkNet = () => fetch("https://tile.openstreetmap.org/0/0/0.png", { mode: "no-cors", cache: "no-store" }).then(() => { offline.style.display = "none"; }, () => { offline.style.display = "flex"; });
+    fr.addEventListener("load", checkNet); window.addEventListener("online", checkNet); window.addEventListener("offline", checkNet);
     const setView = (lat, lon, z = .02) => { fr.src = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - z},${lat - z * .8},${lon + z},${lat + z * .8}&layer=mapnik&marker=${lat},${lon}`; st.set("view", [lat, lon]); };
     const [lat, lon] = st.get("view", [51.5072, -0.1276]); setView(lat, lon);
     const results = h("div");
-    const inp = h("input", { placeholder: "Search Maps", style: { flex: 1, border: 0, outline: 0, background: "none", fontSize: "17px" }, onkeydown: e => e.key === "Enter" && find(inp.value) });
+    const inp = h("input", { placeholder: "Search Maps", "aria-label": "Search Maps", style: { flex: 1, minWidth: 0, border: 0, outline: 0, background: "none", fontSize: "17px", color: "var(--ink)" }, onkeydown: e => e.key === "Enter" && find(inp.value) });
     const sheetEl = h("div.glass", { style: { position: "absolute", left: "8px", right: "8px", bottom: "8px", borderRadius: "30px", padding: "14px 14px 30px" } },
       h("div", { style: { width: "36px", height: "5px", borderRadius: "3px", background: "var(--ink3)", margin: "-6px auto 10px" } }),
-      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", background: "var(--fill)", borderRadius: "12px", padding: "8px 10px" } }, h("span", { html: sys("search"), style: { width: "18px", opacity: .6 } }), inp, h("button", { title: "My location", style: { fontSize: "20px" }, onclick: me }, "➤")),
+      h("div", { style: { display: "flex", alignItems: "center", gap: "8px", background: "var(--fill)", borderRadius: "12px", padding: "8px 10px" } }, h("span", { html: sys("search"), style: { width: "18px", opacity: .6 } }), inp, iconBtn("fwd", "My Location", me)),
       results);
-    ctx.el.append(fr, sheetEl);
+    ctx.el.append(fr, offline, sheetEl); checkNet();
     async function find(q) {
       if (!q) return; results.innerHTML = "<div class='sub' style='padding:10px'>Searching…</div>";
       try { const r = await (await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`)).json();
         results.innerHTML = ""; if (!r.length) results.append(h("div.sub", { style: { padding: "10px" } }, "No results"));
         r.forEach(p => results.append(h("div.row", { style: { background: "none" }, dataset: { entity: "place", title: p.display_name }, onclick: () => { setView(+p.lat, +p.lon, .01); results.innerHTML = ""; results.append(h("div", { style: { padding: "10px 4px" } }, h("b", p.display_name.split(",")[0]), h("div.sub", p.display_name), h("div", { style: { display: "flex", gap: "8px", marginTop: "10px" } }, h("button.pill-btn", { onclick: () => window.open(`https://www.openstreetmap.org/directions?to=${p.lat},${p.lon}`, "_blank", "noopener") }, "Directions"), h("button.pill-btn.grey", { onclick: () => O.share({ title: p.display_name, url: `https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}` }) }, "Share")))); } }, h("div.grow", h("div", p.display_name.split(",")[0]), h("div.sub", p.display_name.split(",").slice(1, 3).join(","))))));
-      } catch { results.innerHTML = "<div class='sub' style='padding:10px'>Search needs an internet connection.</div>"; }
+      } catch { results.innerHTML = "<div class='sub' style='padding:10px'>Couldn't search. Check your internet connection and try again.</div>"; checkNet(); }
     }
     function me() { if (!navigator.geolocation) return O.toast("Location unavailable"); navigator.geolocation.getCurrentPosition(p => setView(p.coords.latitude, p.coords.longitude, .01), () => O.toast("Location permission denied")); }
     ctx.onIntent(it => { if (it.q) { inp.value = it.q; find(it.q); } });
@@ -684,7 +693,7 @@ O.registerApp({ id: "reminders", name: "Reminders", bg: "#fff", glyph: "checklis
     const save = x => { st.set("items", x); O.index.dirty = true; };
     let showDone = false;
     const body = h("div");
-    const draw = () => { body.innerHTML = ""; const all = items();
+    const draw = () => { body.innerHTML = ""; const all = items(); const tb = body.closest && body.closest(".scr")?.querySelector(".nav .grp:last-child .btn"); if (tb) tb.textContent = showDone ? "Hide Completed" : "Show Completed";
       const counts = h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", padding: "0 16px 16px" } }, ...[["Today", all.filter(i => !i.done).length, "#0a84ff"], ["Flagged", all.filter(i => i.flag && !i.done).length, "#ff9f0a"], ["All", all.length, "#555"], ["Completed", all.filter(i => i.done).length, "#8e8e93"]].map(([n, c, col]) =>
         h("div", { style: { background: "var(--card)", borderRadius: "12px", padding: "10px 12px" }, onclick: () => { if (n === "Completed") { showDone = !showDone; draw(); } } }, h("div", { style: { display: "flex", justifyContent: "space-between" } }, h("span", { style: { width: "30px", height: "30px", borderRadius: "50%", background: col, display: "inline-block" } }), h("b", { style: { fontSize: "24px" } }, c)), h("div.sub", { style: { color: "var(--ink3)", fontWeight: 600 } }, n))));
       body.append(counts, hdr("Reminders"));
@@ -696,7 +705,7 @@ O.registerApp({ id: "reminders", name: "Reminders", bg: "#fff", glyph: "checklis
       const input = h("input", { placeholder: "New Reminder", style: { border: 0, outline: 0, background: "none", flex: 1, fontSize: "17px" }, onkeydown: e => { if (e.key === "Enter" && input.value.trim()) { save([...items(), { id: uid(), text: input.value.trim(), done: false }]); draw(); body.querySelector("input")?.focus(); } } });
       L.append(h("div.row", h("span", { style: { color: "var(--accent)", fontSize: "22px" } }, "+"), input)); body.append(L); };
     const menu = i => O.sheet({ title: i.text, actions: [{ label: i.flag ? "Unflag" : "Flag", run: () => { const a = items(); a.find(x => x.id === i.id).flag = !i.flag; save(a); draw(); } }, { label: "Rename", run: () => O.prompt("Rename", i.text).then(v => { if (v) { const a = items(); a.find(x => x.id === i.id).text = v; save(a); draw(); } }) }, { label: "Delete", red: true, run: () => { save(items().filter(x => x.id !== i.id)); draw(); } }] });
-    draw(); ctx.stack().push(() => ({ title: "Reminders", right: h("button.btn", { onclick: () => { showDone = !showDone; draw(); } }, "Show/Hide Done"), body }));
+    draw(); ctx.stack().push(() => ({ title: "Reminders", right: h("button.btn", { onclick: () => { showDone = !showDone; draw(); } }, showDone ? "Hide Completed" : "Show Completed"), body }));
     O.on("reminders-changed", draw);
     ctx.onShow(draw);
   } });
@@ -899,7 +908,7 @@ O.registerApp({ id: "voicememos", name: "Voice Memos", bg: "#111", glyph: () => 
     const wave = h("canvas", { width: 360, height: 80, style: { width: "100%", height: "80px", display: "block" } });
     const draw = () => { L.innerHTML = ""; const m = st.get("memos", []); if (!m.length) L.append(h("div.empty", "No recordings. Tap the red button to record."));
       L.append(h("div.list.flush", m.map(x => h("div.row", { dataset: { entity: "recording", title: x.name }, style: { flexDirection: "column", alignItems: "stretch" } }, h("div", { style: { display: "flex", justifyContent: "space-between" } }, h("b", x.name), h("span.sub", O.fmtDur(x.dur))), h("div.sub", new Date(x.t).toLocaleString()),
-        h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } }, h("audio", { controls: true, src: x.url, style: { flex: 1, height: "34px" } }), h("button", { style: { color: "var(--red)" }, onclick: () => { st.set("memos", st.get("memos", []).filter(y => y.id !== x.id)); draw(); } }, "🗑")))))); };
+        h("div", { style: { display: "flex", alignItems: "center", gap: "10px" } }, h("audio", { controls: true, src: x.url, style: { flex: 1, height: "34px" } }), iconBtn("trash", "Delete Recording", () => { st.set("memos", st.get("memos", []).filter(y => y.id !== x.id)); draw(); }, "var(--red)")))))); };
     const btn = h("button", { style: { width: "70px", height: "70px", borderRadius: "50%", border: "4px solid var(--sep)", display: "grid", placeItems: "center", margin: "0 auto" }, onclick: () => rec ? stop() : start() }, h("span", { style: { width: "54px", height: "54px", borderRadius: "50%", background: "var(--red)", transition: "all .25s" } }));
     async function start() {
       try { streamA = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { return O.toast("Microphone unavailable: " + e.name); }
@@ -945,7 +954,7 @@ O.registerApp({ id: "wallet", name: "Wallet", bg: "#111", glyph: "wallet", categ
     let open = -1;
     const draw = () => { wrap.innerHTML = ""; cards.forEach(([n, sub, bg, ink], i) => { const top = open < 0 ? i * 64 : i === open ? 0 : 420 + (i > open ? i - 1 : i) * 12;
       wrap.append(h("div", { dataset: { entity: "card", title: n }, style: { position: "absolute", left: "16px", right: "16px", top: top + "px", height: "220px", borderRadius: "18px", background: bg, color: ink, padding: "18px", transition: "top .45s cubic-bezier(.3,1.2,.5,1)", boxShadow: "0 -4px 20px rgba(0,0,0,.4)", cursor: "pointer" }, onclick: () => { open = open === i ? -1 : i; draw(); } },
-        h("div", { style: { display: "flex", justifyContent: "space-between", fontWeight: 700 } }, n, "◈"), h("div", { style: { position: "absolute", bottom: "18px", left: "18px", fontSize: "17px", letterSpacing: "1px" } }, sub))); });
+        h("div", { style: { display: "flex", justifyContent: "space-between", fontWeight: 600 } }, h("span", n), h("span", { "aria-hidden": "true", style: { opacity: .7 } }, "◈")), h("div", { style: { position: "absolute", bottom: "18px", left: "18px", fontSize: "17px", letterSpacing: "1px" } }, sub))); });
       if (open >= 0) wrap.append(h("div", { style: { position: "absolute", top: "250px", left: 0, right: 0, textAlign: "center" } }, h("div", { style: { fontSize: "40px" } }, "◎"), h("div", "Hold near reader"), h("div.sub", { style: { color: "#999", marginTop: "8px", fontSize: "12px", padding: "0 40px" } }, "Demo only. These cards are fictional and cannot make payments."), h("button.pill-btn", { style: { marginTop: "14px" }, onclick: () => { O.haptic(40); O.toast("✓ Done (simulated)"); O.tone([[1046, .1], [1318, .2]], { gain: .06 }); } }, "Simulate Tap"))); };
     draw();
     ctx.el.append(h("div", { style: { padding: "60px 16px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" } }, h("h1", { style: { margin: 0 } }, "Wallet"), h("button.tbtn.circ", { style: { background: "#222", color: "#fff" }, onclick: () => O.toast("Adding cards isn't possible in a demo") }, "+")), wrap);
