@@ -495,7 +495,7 @@ O.registerApp({ id: "clock", name: "Clock", bg: "#111", glyph: () => O.svg(`<cir
     let cur = null;
     const show = i => { if (cur && cur.b.cleanup) cur.b.cleanup(); host.innerHTML = ""; cur = pages[i](); host.append(h("div.nav", { style: { background: "#000" } }, h("div.bar", h("div.grp"), h("div.ttl"), h("div.grp", cur.right || "")), h("h1", cur.title)), h("div.scroll", { style: { position: "absolute", top: "140px", bottom: "0", left: 0, right: 0 } }, cur.b)); };
     const tabs = tabbar([{ icon: "home", label: "World Clock" }, { icon: "bell", label: "Alarms" }, { icon: "timer", label: "Stopwatch" }, { icon: "timer", label: "Timers" }], show, 1);
-    tabs.style.background = "rgba(30,30,32,.8)"; ctx.el.append(tabs); show(1);
+    tabs.style.background = "rgba(30,30,32,.8)"; tabs.style.setProperty("--ink2", "#aeaeb2"); tabs.style.setProperty("--fill", "rgba(255,255,255,.14)"); ctx.el.append(tabs); show(1);
     ctx.onIntent(it => { if (it.tab === "timer") tabs.select(3); });
   } });
 // alarms fire from the shell clock tick, even when Clock is closed

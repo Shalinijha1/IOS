@@ -4,7 +4,7 @@ Behavioural reverse engineering of iOS 27 interaction patterns, plus original we
 
 ## Glassline OS: a phone OS that runs in your browser (`phone/`)
 
-A full iOS-style phone shell with a boot screen, lock screen, Home Screen, widgets, App Library, Control Centre, notifications, app switcher, island live activities, search, an assistant, a Store and 40 working apps. See [`phone/FEATURES.md`](phone/FEATURES.md) for every feature, how it works, the test that verifies it, and what can't be done in a browser.
+A full iOS-style phone shell with a boot screen, lock screen, Home Screen, widgets, App Library, Control Centre, notifications, app switcher, island live activities, search, an assistant, a Store and 40 working apps. Visual tokens (colour, type scale, radii, press feedback) follow `phone/DESIGN.md`, the Apple-inspired guide from [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) (MIT); logo, icons and artwork remain Glassline's own. See [`phone/FEATURES.md`](phone/FEATURES.md) for every feature, how it works, the test that verifies it, and what can't be done in a browser.
 
 **Run it on your computer** (needs Python 3, which is preinstalled on macOS and Linux; on Windows install it from python.org):
 
