@@ -495,3 +495,9 @@ body.android #frame { position: fixed; left: 0; top: 0; }
 .st-rank { margin: 0 20px; }
 .st-num { width: 18px; text-align: center; font-size: 17px; color: var(--ink); }
 .win[data-app="store"] .scroll { padding-bottom: 120px; }
+
+/* Panel mode (Android edge swipe): only Control Centre or Notification Centre, over the app behind */
+html.panel, body.panel, body.panel #stage, body.panel #frame, body.panel #screen { background: transparent !important; }
+body.panel #wall, body.panel #home, body.panel #windows, body.panel #island, body.panel #homeBarZone, body.panel #status, body.panel #boot, body.panel #dim { display: none !important; }
+body.panel #cover .bg { background: rgba(10,12,18,.55) !important; filter: none !important; }
+body.panel #cc { background: rgba(10,12,18,.45); }

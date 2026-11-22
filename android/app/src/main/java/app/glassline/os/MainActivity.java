@@ -64,6 +64,10 @@ public class MainActivity extends Activity {
     private static final String START = "https://" + HOST + "/assets/index.html?app=1&android=1";
     private static final int REQ_MEDIA = 1, REQ_LOCATION = 2;
 
+    /** Overridden by PanelActivity: Control Centre or Notification Centre shown over another app. */
+    protected boolean isPanel() { return false; }
+    protected String startUrl() { return START; }
+
     /** The running activity, so the notification listener can forward notifications to the page. */
     static MainActivity current;
 
@@ -87,7 +91,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        current = this;
+        if (!isPanel()) current = this;
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
@@ -98,7 +102,7 @@ public class MainActivity extends Activity {
                 .build();
 
         web = new WebView(this);
-        web.setBackgroundColor(Color.BLACK);
+        web.setBackgroundColor(isPanel() ? Color.TRANSPARENT : Color.BLACK);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -156,7 +160,9 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(), "GlasslineAndroid");
         setContentView(web);
         hideSystemBars();
-        if (state != null) web.restoreState(state); else web.loadUrl(START);
+        if (state != null && !isPanel()) web.restoreState(state); else web.loadUrl(startUrl());
+        if (isPanel()) return;   // panels don't watch packages or the screen
+        if (Prefs.edgeSwipes(this) && Settings.canDrawOverlays(this)) EdgeService.start(this);
 
         IntentFilter pf = new IntentFilter();
         pf.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -171,7 +177,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        try { unregisterReceiver(packages); unregisterReceiver(screen); } catch (IllegalArgumentException ignored) { }
+        if (!isPanel()) try { unregisterReceiver(packages); unregisterReceiver(screen); } catch (IllegalArgumentException ignored) { }
         if (current == this) current = null;
         super.onDestroy();
     }
@@ -227,12 +233,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        if (isPanel()) { setIntent(intent); web.loadUrl(startUrl()); return; }
         if (intent != null && intent.hasCategory(Intent.CATEGORY_HOME)) web.evaluateJavascript("window.GOS && GOS.goHome()", null);
     }
 
-    @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); web.saveState(out); }
+    @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); if (!isPanel()) web.saveState(out); }
     @Override protected void onPause() { super.onPause(); web.onPause(); }
-    @Override protected void onResume() { super.onResume(); web.onResume(); hideSystemBars(); js("window.GOS && GOS.emit && GOS.emit('android-resume')"); }
+    @Override protected void onResume() { super.onResume(); web.onResume(); hideSystemBars(); if (!isPanel()) js("window.GOS && GOS.emit && GOS.emit('android-resume')"); }
 
     private void start(Intent i) {
         runOnUiThread(() -> { try { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); } catch (ActivityNotFoundException ignored) { } });
@@ -262,9 +269,14 @@ public class MainActivity extends Activity {
                     o.put("label", String.valueOf(ri.loadLabel(pm)));
                     o.put("category", ai.category);
                     o.put("system", (ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0 && (ai.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0);
-                    String key = pkg + "@" + ai.sourceDir + "@" + new java.io.File(ai.sourceDir).lastModified();
+                    String pack = Prefs.iconPack(MainActivity.this);
+                    String key = pkg + "/" + ri.activityInfo.name + "@" + pack + "@" + new java.io.File(ai.sourceDir).lastModified();
                     String icon = iconCache.get(key);
-                    if (icon == null) { icon = iconDataUrl(ri.loadIcon(pm)); iconCache.put(key, icon); }
+                    if (icon == null) {
+                        Drawable themed = IconPacks.icon(MainActivity.this, pack, pkg, ri.activityInfo.name);
+                        icon = themed != null ? packIconDataUrl(themed) : iconDataUrl(ri.loadIcon(pm));
+                        iconCache.put(key, icon);
+                    }
                     o.put("icon", icon);
                     out.put(o);
                 } catch (Exception ignored) { }
@@ -394,6 +406,49 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void cancelNotification(String key) { NotificationService.dismiss(key); }
+
+        /** Closes a Control Centre / Notification Centre panel shown over another app. */
+        @JavascriptInterface
+        public void closePanel() { if (isPanel()) runOnUiThread(() -> { finish(); overridePendingTransition(0, android.R.anim.fade_out); }); }
+
+        /** Edge swipes in every app: needs "Display over other apps". Returns whether they are now on. */
+        @JavascriptInterface
+        public boolean setEdgeSwipes(boolean on) {
+            Prefs.setEdgeSwipes(MainActivity.this, on);
+            if (!on) { EdgeService.stop(MainActivity.this); return false; }
+            if (!Settings.canDrawOverlays(MainActivity.this)) {
+                start(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+                return false;
+            }
+            EdgeService.start(MainActivity.this);
+            return true;
+        }
+
+        @JavascriptInterface
+        public boolean edgeSwipesOn() { return Prefs.edgeSwipes(MainActivity.this) && Settings.canDrawOverlays(MainActivity.this); }
+
+        /** Installed icon packs (ADW / Nova format) as [{pkg,label}]. */
+        @JavascriptInterface
+        public String listIconPacks() { return IconPacks.list(MainActivity.this).toString(); }
+
+        @JavascriptInterface
+        public String iconPack() { return Prefs.iconPack(MainActivity.this); }
+
+        /** Applies an icon pack to every app ("" for the apps' own icons). */
+        @JavascriptInterface
+        public void setIconPack(String pkg) { Prefs.setIconPack(MainActivity.this, pkg); iconCache.clear(); IconPacks.clear(); }
+    }
+
+    /** Icon-pack drawables are finished artwork: draw them edge to edge. */
+    private static String packIconDataUrl(Drawable d) {
+        int size = 144;
+        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
+        d.setBounds(0, 0, size, size);
+        d.draw(c);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, bytes);
+        return "data:image/png;base64," + Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP);
     }
 
     /** Draws an app icon as a full-bleed square; Glassline rounds the corners. */

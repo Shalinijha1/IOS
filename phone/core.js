@@ -1049,7 +1049,7 @@ function coverShow(mode) {
   coverEl.classList.add("on"); coverEl.classList.toggle("nc", mode === "nc");
   coverEl.style.transform = "none"; renderLock(); renderNC(); statusInk();
 }
-function coverHide() { coverEl.classList.remove("on", "nc"); coverEl.style.transform = ""; state.ncOpen = false; $("#passcode").classList.remove("on"); statusInk(); }
+function coverHide() { const was = coverEl.classList.contains("on"); coverEl.classList.remove("on", "nc"); coverEl.style.transform = ""; state.ncOpen = false; $("#passcode").classList.remove("on"); statusInk(); if (was) panelDone(); }
 function lock() {
   if (state.locked && !state.awake) return wake();
   closeOverlays(); SOUND.lock(); haptic();
@@ -1260,7 +1260,7 @@ const INCOMING = [
 ];
 let incomingT = 0, incomingI = Math.floor(Math.random() * INCOMING.length);
 function scheduleIncoming() {
-  clearTimeout(incomingT); if (!S.simulateMessages) return;
+  clearTimeout(incomingT); if (!S.simulateMessages || PANEL) return;
   incomingT = setTimeout(() => {
     if (state.booted && !S.airplane) { const [from, text] = INCOMING[incomingI++ % INCOMING.length]; emit("incoming-message", { from, text }); }
     scheduleIncoming();
@@ -1280,7 +1280,7 @@ function ccProgress(p, animate) {
   if (!animate) return apply(p);
   spring("cc", p === 1 ? .3 : p, 1, { response: .38, damping: .8 }, apply);
 }
-function ccClose() { spring("cc", 1, 0, { response: .3, damping: 1 }, t => { ccEl.style.opacity = t; $("#ccGrid").style.transform = `scale(${lerp(.9, 1, t)})`; }).then(() => { ccEl.classList.remove("on"); state.ccOpen = false; statusInk(); }); }
+function ccClose() { spring("cc", 1, 0, { response: .3, damping: 1 }, t => { ccEl.style.opacity = t; $("#ccGrid").style.transform = `scale(${lerp(.9, 1, t)})`; }).then(() => { ccEl.classList.remove("on"); state.ccOpen = false; statusInk(); panelDone(); }); }
 function renderCC() {
   const g = $("#ccGrid"); g.innerHTML = "";
   const tog = (key, icon, color, label) => h("button.ccm.r" + (S[key] ? ".on." + color : ""), { title: label, html: sys(icon), onclick: e => { e.stopPropagation(); if (P().toggle && P().toggle(key)) { ccClose(); return; } set(key, !S[key]); if (key === "airplane" && S.airplane) { set("wifi", false); set("cellular", false); set("bluetooth", false); } haptic(); renderCC(); toast(`${label} ${S[key] ? "On" : "Off"}`); } });
@@ -1694,7 +1694,7 @@ function closeOverlays(except) {
   closeCtx(); live.expanded = false; live.update();
 }
 let autoLockT = 0;
-function resetAutoLock(ms) { clearTimeout(autoLockT); const t = ms || S.autoLock * 1000; if (!t) return; autoLockT = setTimeout(() => { if (state.locked) sleepScreen(); else if (S.autoLock) lock(); }, t); }
+function resetAutoLock(ms) { clearTimeout(autoLockT); if (PANEL) return; const t = ms || S.autoLock * 1000; if (!t) return; autoLockT = setTimeout(() => { if (state.locked) sleepScreen(); else if (S.autoLock) lock(); }, t); }
 function powerOffUI() {
   closeOverlays(); const po = $("#powerOff"); po.classList.add("on");
   const knob = $(".po-knob", po);
@@ -1743,7 +1743,17 @@ function spKeys(e) {
 /* ======================================================================== */
 const LOGO = `<svg viewBox="0 0 92 110" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#cfd3dc"/></linearGradient></defs>
 <path d="M46 4C60 26 84 44 84 68a38 38 0 0 1-76 0C8 44 32 26 46 4z" fill="url(#lg)"/><path d="M30 66a16 16 0 0 0 16 16" stroke="#000" stroke-width="5" stroke-linecap="round" opacity=".85"/></svg>`;
+const PANEL = new URLSearchParams(location.search).get("panel");   // "cc" or "nc": shown over another app
+function panelDone() { if (PANEL && window.GlasslineAndroid && GlasslineAndroid.closePanel) GlasslineAndroid.closePanel(); }
 async function boot() {
+  if (PANEL) {
+    document.documentElement.classList.add("panel"); document.body.classList.add("panel");
+    $("#boot").style.display = "none"; state.booted = true; state.locked = false; state.mode = "home"; state.awake = true;
+    screen.classList.remove("booting", "locked", "screen-off"); applySettings();
+    emit("booted");
+    if (PANEL === "cc") openCC(); else openNC();
+    return;
+  }
   state.mode = "boot"; screen.classList.add("booting"); screen.classList.remove("screen-off");
   const b = $("#boot"); b.classList.remove("off"); b.style.display = "flex"; $("#dim").style.opacity = 0;
   $("#bootLogo").innerHTML = LOGO;
@@ -1856,6 +1866,7 @@ window.GOS = {
   screenEntities, setBadge, standby, folders, openFolder, mergeIntoFolder, badges, state, saved, persist, layout, renderHome, index, calcAnswer, start, boot, makeStack, asChip, findApp,
   reset() { localStorage.removeItem(KEY); location.reload(); },
   androidBack() {
+    if (PANEL) { closeOverlays(); panelDone(); return true; }
     if (state.locked) return false;
     const layer = $("#sheetLayer"); if (layer.children.length) { const s = layer.querySelector(".scrim"); if (s) s.click(); return true; }
     if (assistantOn || state.spotlight || state.ccOpen || coverEl.classList.contains("on") || ctxEl) { closeOverlays(); return true; }

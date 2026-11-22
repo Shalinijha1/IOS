@@ -13,6 +13,10 @@ Behavioural reverse engineering of iOS 27 interaction patterns, plus original we
 
 What you get: every installed app as an icon that opens the real app, with the dock holding your default phone, messages, browser and camera apps. Apps you install or remove elsewhere appear and disappear automatically, and Delete App and App Info use Android's own screens. It also has the lock screen, Control Centre (real flashlight and volume; Wi-Fi, Bluetooth, mobile data and Airplane Mode open Android's panels), your apps' notifications as banners and in Notification Centre, search across your apps, the assistant, widgets and Glassline's own apps. Android's Back gesture closes whatever is open in Glassline.
 
+**Edge swipes in every app** (Home Settings › Edge Swipes in Every App): pull down from just below the top-left or top-right edge inside any app to open Glassline's Notification Centre or Control Centre over that app. Closing it drops you back where you were. This needs “Display over other apps”, and Android requires a quiet ongoing notification while it's on. It deliberately doesn't use the Accessibility permission, which Google Play reserves for disability tools and which would let the app read other apps' screens.
+
+**Icon packs** (Home Settings › Icon Pack): any installed icon pack in the common ADW/Nova format restyles every app's icon, read from the pack's `appfilter.xml` the way other launchers do.
+
 Limits: Android, not iOS, still runs underneath, so the phone's own settings, the system lock (PIN or fingerprint) and app screens stay Android's. Apps from Apple's App Store can't run on Android; the Store opens Google Play for real apps. Every push rebuilds the APK in GitHub Actions (`.github/workflows/android.yml`). To build it yourself, run `cd android && gradle assembleRelease`, which needs the Android SDK. The APK is signed with the standard debug key, so sign it with your own key before publishing it anywhere.
 
 ## Glassline OS: a phone OS that runs in your browser (`phone/`)

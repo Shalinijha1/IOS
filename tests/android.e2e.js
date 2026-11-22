@@ -34,6 +34,9 @@ const BRIDGE = () => {
     setVolume(v) { rec("setVolume", v); }, setBrightness(v) { rec("setBrightness", v); }, openPanel(n) { rec("openPanel", n); },
     isDefaultHome() { return false; }, chooseHomeApp() { rec("chooseHomeApp"); }, hasNotificationAccess() { return false; }, requestNotificationAccess() { rec("requestNotificationAccess"); },
     openNotification(k) { rec("openNotification", k); return true; }, cancelNotification(k) { rec("cancelNotification", k); }, openPlayStore(q) { rec("openPlayStore", q); }, openSystemSettings() { rec("openSystemSettings"); },
+    edgeSwipesOn() { return !!window.__edge; }, setEdgeSwipes(on) { rec("setEdgeSwipes", on); window.__edge = on; return on; },
+    listIconPacks() { return JSON.stringify([{ pkg: "com.example.roundpack", label: "Round Pack" }]); }, iconPack() { return window.__pack || ""; },
+    setIconPack(p) { rec("setIconPack", p); window.__pack = p; apps = null; }, closePanel() { rec("closePanel"); },
     __remove(pkg) { apps = apps.filter(a => a.pkg !== pkg); },
   };
 };
@@ -130,6 +133,28 @@ const BRIDGE = () => {
   await page.evaluate(() => GOS.androidScreen(true)); await page.waitForTimeout(300);
   check("screen on shows the lock screen awake", await page.evaluate(() => GOS.state.awake && document.querySelector("#cover").classList.contains("on")));
   await page.screenshot({ path: path.join(shots, "android-lock.png") });
+
+  // Home Settings: edge swipes and icon packs
+  await page.evaluate(() => GOS.androidHome.setEdge(true));
+  check("edge swipes can be switched on from Home Settings", (await calls()).some(c => c[0] === "setEdgeSwipes" && c[1] === true));
+  await page.evaluate(() => GOS.androidHome.chooseIconPack()); await page.waitForTimeout(400);
+  await page.evaluate(() => [...document.querySelectorAll(".as-group button")].find(b => b.textContent === "Round Pack").click()); await page.waitForTimeout(300);
+  check("choosing an icon pack applies it", (await calls()).some(c => c[0] === "setIconPack" && c[1] === "com.example.roundpack") && await page.evaluate(() => GOS.androidHome.iconPackName() === "Round Pack"));
+
+  // panel mode: Control Centre over another app, then closes itself
+  const panel = await ctx.newPage(); panel.on("pageerror", e => errors.push("panel: " + e.message));
+  await panel.route(/^https?:\/\/(?!localhost)/, r => r.abort());
+  await panel.goto(url.replace("&fast", "&panel=cc"));
+  await panel.waitForFunction(() => window.GOS && GOS.state.booted, null, { timeout: 8000 }); await panel.waitForTimeout(600);
+  check("panel opens Control Centre straight away, no boot or lock", await panel.evaluate(() => GOS.state.ccOpen && !GOS.state.locked && document.querySelector("#boot").style.display === "none"));
+  check("panel background is see-through so the app behind shows", await panel.evaluate(() => getComputedStyle(document.body).backgroundColor === "rgba(0, 0, 0, 0)" && getComputedStyle(document.querySelector("#wall")).display === "none"));
+  await panel.screenshot({ path: path.join(shots, "android-panel-cc.png") });
+  await panel.keyboard.press("c"); await panel.waitForTimeout(600);
+  check("closing Control Centre closes the panel", await panel.evaluate(() => window.__bridgeCalls.some(c => c[0] === "closePanel")));
+  await panel.goto(url.replace("&fast", "&panel=nc")); await panel.waitForFunction(() => window.GOS && GOS.state.booted); await panel.waitForTimeout(600);
+  check("left-edge panel opens Notification Centre", await panel.evaluate(() => document.querySelector("#cover").classList.contains("nc")));
+  check("Back inside a panel closes it", await panel.evaluate(() => GOS.androidBack() === true && window.__bridgeCalls.some(c => c[0] === "closePanel")));
+  await panel.close();
 
   check("no page errors", errors.length === 0, errors.join(" | "));
   await browser.close(); server.close();

@@ -10,6 +10,10 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Delete App asks Android to show its own uninstall dialog. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Edge swipes in every app: invisible strips drawn over other apps, kept alive by a foreground service. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
@@ -19,6 +23,10 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- Icon packs (ADW / Nova format) -->
+        <intent><action android:name="org.adw.launcher.THEMES" /></intent>
+        <intent><action android:name="org.adw.ActivityStarter.THEMES" /></intent>
+        <intent><action android:name="com.novalauncher.THEME" /></intent>
     </queries>
 
     <application
@@ -54,6 +62,27 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity-alias>
+
+        <!-- Control Centre / Notification Centre over the current app, opened by an edge swipe. -->
+        <activity
+            android:name=".PanelActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Glassline.Panel"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.glassline.os.panel"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|uiMode|density" />
+
+        <service
+            android:name=".EdgeService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the user-enabled edge-swipe strips that open Control Centre and Notification Centre over other apps." />
+        </service>
 
         <!-- Optional: with notification access, the phone's notifications appear in Glassline. -->
         <service

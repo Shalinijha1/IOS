@@ -109,6 +109,17 @@ O.androidHome = {
   systemSettings: () => call("openSystemSettings"),
   hasNotificationAccess: () => !!call("hasNotificationAccess"),
   requestNotificationAccess: () => call("requestNotificationAccess"),
+  edgeOn: () => !!call("edgeSwipesOn"),
+  setEdge: on => !!call("setEdgeSwipes", !!on),
+  iconPacks: () => { try { return JSON.parse(call("listIconPacks") || "[]"); } catch { return []; } },
+  iconPackName: () => { const cur = call("iconPack") || ""; return cur ? ((O.androidHome.iconPacks().find(p => p.pkg === cur) || {}).label || cur) : "App Icons"; },
+  // icon packs restyle every app's icon; Glassline reads the pack's appfilter like other launchers do
+  chooseIconPack: () => {
+    const packs = O.androidHome.iconPacks();
+    const pick = pkg => { call("setIconPack", pkg); sync(); O.toast(pkg ? "Icon pack applied" : "Using each app's own icon"); };
+    O.sheet({ title: "Icon Pack", message: packs.length ? "Applies to every app on the Home Screen." : "No icon packs installed. Get one from Google Play, then come back here.",
+      actions: [{ label: "App Icons (default)", run: () => pick("") }, ...packs.map(p => ({ label: p.label, run: () => pick(p.pkg) })), { label: "Find Icon Packs on Google Play", run: () => call("openPlayStore", "icon pack") }] });
+  },
 };
 function setupPrompt() {
   const steps = [];
