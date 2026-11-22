@@ -264,15 +264,27 @@ O.registerApp({ id: "store", name: "Store", bg: "linear-gradient(#20b2ff,#1a6dff
         const card = (label, title, a, bg) => h("div", { style: { margin: "0 16px 18px", borderRadius: "22px", overflow: "hidden", background: bg, color: "#fff", padding: "20px", minHeight: "300px", display: "flex", flexDirection: "column", boxShadow: "0 10px 30px rgba(0,0,0,.15)", cursor: "pointer" }, onclick: () => a && product(a) },
           h("div", { style: { fontSize: "13px", fontWeight: 700, opacity: .8 } }, label), h("div", { style: { fontSize: "28px", fontWeight: 800, lineHeight: 1.1 } }, title), h("div", { style: { marginTop: "auto", display: "flex", alignItems: "center", gap: "10px", background: "rgba(255,255,255,.18)", borderRadius: "14px", padding: "8px" } }, a ? [O.iconEl(a, { size: 44 }), h("div", { style: { flex: 1 } }, h("b", a.name), h("div", { style: { fontSize: "12px", opacity: .85 } }, a.subtitle)), getBtn(a, true)] : null));
         return { title: "Today", under: h("div.sub", { style: { color: "var(--ink3)", fontWeight: 600, textTransform: "uppercase" } }, new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })),
-          body: h("div", pick ? card("APP OF THE DAY", pick.subtitle, pick, pick.bg) : null, card("GET STARTED", "Games to play in a spare minute", O.apps.bubbles, "linear-gradient(135deg,#0b486b,#1fa2ff)"), card("WELLBEING", "Small habits, big changes", O.apps.habits, "linear-gradient(135deg,#f5576c,#f093fb)"), h("div", { style: { height: "100px" } })) }; },
+          body: h("div", play() ? playCard() : null, pick ? card("APP OF THE DAY", pick.subtitle, pick, pick.bg) : null, card("GET STARTED", "Games to play in a spare minute", O.apps.bubbles, "linear-gradient(135deg,#0b486b,#1fa2ff)"), card("WELLBEING", "Small habits, big changes", O.apps.habits, "linear-gradient(135deg,#f5576c,#f093fb)"), h("div", { style: { height: "100px" } })) }; },
       () => ({ title: "Games", body: h("div", h("div.list.flush", catalog().filter(a => a.category === "Games").map(appRow)), h("div", { style: { height: "100px" } })) }),
       () => { const cats = {}; catalog().filter(a => a.category !== "Games").forEach(a => (cats[a.category] = cats[a.category] || []).push(a));
         return { title: "Apps", body: h("div", ...Object.entries(cats).map(([c, l]) => [T.hdr(c), h("div.list.flush", l.map(appRow))]), h("div", { style: { height: "100px" } })) }; },
-      () => { const res = h("div.list.flush"); const q = h("input", { placeholder: "Games, Apps and More", oninput: () => { const v = q.value.toLowerCase(); res.innerHTML = ""; catalog().filter(a => !v || (a.name + " " + (a.keywords || "") + " " + (a.subtitle || "")).toLowerCase().includes(v)).forEach(a => res.append(appRow(a))); } });
-        setTimeout(() => q.oninput(), 0);
+      () => { const res = h("div.list.flush"); const q = h("input", { placeholder: "Games, Apps and More", oninput: () => { const v = q.value.toLowerCase(); res.innerHTML = ""; catalog().filter(a => !v || (a.name + " " + (a.keywords || "") + " " + (a.subtitle || "")).toLowerCase().includes(v)).forEach(a => res.append(appRow(a))); if (play()) res.prepend(playRow(q.value)); } });
+        setTimeout(() => q.dispatchEvent(new Event("input")), 0);
         return { title: "Search", body: h("div", h("div.searchbar", { html: sys("search") }, q), res, foot()) }; },
     ];
-    function foot() { return h("p.sub", { style: { padding: "16px", color: "var(--ink3)", fontSize: "12px" } }, "Store apps are original web apps bundled with Glassline OS. Real iPhone apps can't run in a browser."); }
+    // In the Android app, real apps come from Google Play
+    const play = () => O.platform && O.platform.playStore;
+    function playRow(query) {
+      return h("div.row", { style: { padding: "10px 16px" }, onclick: () => O.platform.playStore(query) },
+        h("div", { style: { width: "58px", height: "58px", borderRadius: "14px", background: "var(--fill)", display: "grid", placeItems: "center", color: "var(--accent)" }, html: sys("search") }),
+        h("div.grow", h("div", query ? `Search Google Play for “${query}”` : "Browse Google Play"), h("div.sub", "Real Android apps install onto your Home Screen")), h("span.go"));
+    }
+    function playCard() {
+      return h("div", { style: { margin: "0 16px 18px", borderRadius: "22px", background: "var(--card)", padding: "18px", display: "flex", alignItems: "center", gap: "14px", cursor: "pointer" }, onclick: () => O.platform.playStore("") },
+        h("div", { style: { flex: 1 } }, h("div", { style: { fontSize: "13px", fontWeight: 600, color: "var(--ink3)" } }, "YOUR PHONE'S APPS"), h("div", { style: { fontSize: "20px", fontWeight: 600, letterSpacing: "-0.374px" } }, "Get apps from Google Play"), h("div.sub", { style: { color: "var(--ink3)", fontSize: "14px" } }, "They appear on your Home Screen as soon as they install.")),
+        h("button.pill-btn", { style: { minHeight: "32px" } }, "Open"));
+    }
+    function foot() { return h("p.sub", { style: { padding: "16px", color: "var(--ink3)", fontSize: "12px" } }, (play() ? "Apps listed here are Glassline’s own. Real Android apps come from Google Play." : "Store apps are original web apps bundled with Glassline OS. Real iPhone apps can't run in a browser.")); }
     const tabs = T.tabbar([{ icon: "star", label: "Today" }, { icon: "rec", label: "Games" }, { icon: "grid", label: "Apps" }, { icon: "search", label: "Search" }], i => stack.replaceRoot(pages[i]), 0);
     ctx.el.append(tabs); stack.replaceRoot(pages[0]);
     O.on("store-show", id => { const a = O.apps[id]; if (a) product(a); });

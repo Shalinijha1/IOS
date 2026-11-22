@@ -1,0 +1,39 @@
+# Builds the Glassline OS Android app (APK) on every change to the shell or the Android project.
+# Download it from the Actions tab → the run → Artifacts. Pushing a tag like v27.0.0 also attaches it to a GitHub Release.
+name: Android app
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths: ["phone/**", "android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+      - name: Build APK
+        working-directory: android
+        run: gradle --no-daemon assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GlasslineOS-android
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/release/app-release.apk

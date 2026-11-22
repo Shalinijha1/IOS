@@ -3,7 +3,7 @@
  * public behaviour documented in ../EVIDENCE.md. Not affiliated with Apple. */
 (function () {
 "use strict";
-const W = 393, H = 852;
+const W = 393; let H = 852;   // H adapts to the phone's aspect ratio in the Android app
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -118,6 +118,7 @@ const SYS = { // small UI glyphs used by the shell (stroke = currentColor)
   external: '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" stroke-linecap="round" stroke-linejoin="round"/>',
   reload: '<path d="M19 12a7 7 0 1 1-2-5M19 4v4h-4" stroke-linecap="round" stroke-linejoin="round"/>',
   pen: '<path d="M4 20h4L19 9l-4-4L4 16z" stroke-linejoin="round"/><path d="m13.5 6.5 4 4"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2" stroke-linecap="round"/>',
   scan: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/>',
 };
 const svg = (inner, vb = "0 0 24 24", cls = "") => `<svg viewBox="${vb}" class="${cls}" fill="none" stroke="currentColor" stroke-width="2">${inner}</svg>`;
@@ -142,6 +143,7 @@ const DEFAULTS = {
   appearance: "auto", glass: 55, brightness: 1, volume: .6, wallpaper: 0, lockFont: 0,
   wifi: true, bluetooth: true, cellular: true, airplane: false, hotspot: false, silent: false, focus: null, rotationLock: true,
   reduceMotion: false, reduceTransparency: false, nightShift: false, passcode: "", faceUnlock: true, autoLock: 120,
+  iconStyle: "default", iconTint: 210,
   simulateMessages: true, summaries: true, sounds: true, haptics: true, name: "My Phone", owner: "You", textSize: 1,
   showHelp: true, lowPower: false, boldText: false,
 };
@@ -245,8 +247,9 @@ function registerApp(def) {
   return def;
 }
 function iconEl(app, opts = {}) {
-  const el = h("div.icon", { style: { background: app.bg }, dataset: { app: app.id } });
-  el.innerHTML = typeof app.glyph === "function" ? app.glyph() : svg(G[app.glyph] || app.glyph, "0 0 24 24") ;
+  const el = h("div.icon", { style: { background: app.iconUrl ? `#fff center/cover url("${app.iconUrl}")` : app.bg }, dataset: { app: app.id } });
+  if (app.iconUrl) el.classList.add("native");
+  else el.innerHTML = typeof app.glyph === "function" ? app.glyph() : svg(G[app.glyph] || app.glyph, "0 0 24 24") ;
   const svgEl = el.querySelector("svg"); if (svgEl) { svgEl.setAttribute("stroke", "#fff"); svgEl.setAttribute("stroke-width", "1.8"); }
   if (opts.size) Object.assign(el.style, { width: opts.size + "px", height: opts.size + "px", borderRadius: opts.size * .235 + "px" });
   return el;
@@ -257,7 +260,7 @@ const isInstalled = id => apps[id] && (apps[id].builtin ? !(saved.removed || [])
 const DEFAULT_LAYOUT = {
   pages: [
     ["w:weather", "w:calendar", "calendar", "photos", "camera", "mail", "clock", "maps", "weather", "reminders", "notes", "store", "calculator", "wallet", "settings", "health"],
-    ["w:batteries", "files", "voicememos", "contacts", "compass", "magnifier", "translate", "tips", "facetime", "w:music"],
+    ["w:batteries", "shortcuts", "screentime", "journal", "freeform", "findmy", "home", "files", "voicememos", "contacts", "compass", "magnifier", "translate", "tips", "facetime", "w:music"],
   ],
   dock: ["phone", "browser", "messages", "music"],
 };
@@ -267,19 +270,63 @@ function layout() {
 }
 const SLOTS = 24;
 const weight = it => it.startsWith("w:") ? (WIDGETS[it.slice(2)]?.size === "wide" ? 8 : 4) : 1;
+const folders = () => (saved.folders = saved.folders || {});
+const inFolder = id => Object.keys(folders()).find(f => folders()[f].apps.includes(id));
 function placeApp(id) {
   const L = layout();
-  if (L.pages.flat().includes(id) || L.dock.includes(id)) return;
+  if (L.pages.flat().includes(id) || L.dock.includes(id) || inFolder(id)) return;
   let pg = L.pages.find(p => p.reduce((a, it) => a + weight(it), 0) < SLOTS);
   if (!pg) { pg = []; L.pages.push(pg); }
   pg.push(id); persist();
 }
 function unplace(id) {
   const L = layout();
+  const f = inFolder(id);
+  if (f) { folders()[f].apps = folders()[f].apps.filter(x => x !== id); collapseFolder(f); }
   L.pages.forEach(p => { const i = p.indexOf(id); if (i >= 0) p.splice(i, 1); });
   const d = L.dock.indexOf(id); if (d >= 0) L.dock.splice(d, 1);
   L.pages = L.pages.filter((p, i) => p.length || i === 0);
   persist();
+}
+
+/* a folder with one app turns back into that app; an empty folder disappears */
+function collapseFolder(fid) {
+  const F = folders()[fid]; if (!F) return;
+  if (F.apps.length > 1) return persist();
+  const L = layout(), key = "f:" + fid;
+  for (const arr of [...L.pages, L.dock]) { const i = arr.indexOf(key); if (i >= 0) { if (F.apps.length) arr[i] = F.apps[0]; else arr.splice(i, 1); } }
+  delete folders()[fid]; persist();
+}
+function mergeIntoFolder(dragId, targetId) {
+  const L = layout();
+  for (const arr of [...L.pages, L.dock]) { const i = arr.indexOf(dragId); if (i >= 0) arr.splice(i, 1); }
+  if (targetId.startsWith("f:")) { folders()[targetId.slice(2)].apps.push(dragId); persist(); return targetId.slice(2); }
+  const fid = Math.random().toString(36).slice(2, 8);
+  const cat = apps[targetId] && apps[targetId].category;
+  folders()[fid] = { name: ({ Productivity: "Productivity", Social: "Social", Utilities: "Utilities", Creativity: "Creativity", Entertainment: "Entertainment", Information: "Information", Health: "Health & Fitness", Games: "Games" })[cat] || "Folder", apps: [targetId, dragId] };
+  for (const arr of [...L.pages, L.dock]) { const i = arr.indexOf(targetId); if (i >= 0) arr[i] = "f:" + fid; }
+  persist(); return fid;
+}
+function folderCell(fid, where) {
+  const F = folders()[fid]; if (!F) return h("div");
+  const ic = h("div.icon.folder", F.apps.slice(0, 9).map(id => apps[id] ? iconEl(apps[id]) : h("div")));
+  const n = F.apps.reduce((a, id) => a + (badges[id] || 0), 0);
+  const cell = h("div.cell", { dataset: { item: "f:" + fid } }, ic, h("div.lbl", F.name));
+  if (n) cell.append(h("div.badge", n > 99 ? "99+" : n));
+  cell.addEventListener("pointerdown", e => iconPress(e, cell, "f:" + fid, where));
+  return cell;
+}
+function openFolder(fid) {
+  const F = folders()[fid]; if (!F) return;
+  const title = h("button", { style: { position: "absolute", top: "150px", left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: "30px", fontWeight: 600, letterSpacing: "-0.374px", pointerEvents: "auto" }, "aria-label": "Rename folder",
+    onclick: () => prompt_("Rename Folder", F.name).then(v => { if (v && v.trim()) { F.name = v.trim(); title.textContent = F.name; persist(); renderHome(); } }) }, F.name);
+  const grid = h("div.glass.folder-open", F.apps.filter(id => apps[id]).map(id => {
+    const c = h("div.cell", iconEl(apps[id]), h("div.lbl", apps[id].name));
+    let t; c.addEventListener("pointerdown", () => { t = setTimeout(() => { t = -1; sheet({ title: apps[id].name, actions: [{ label: "Move to Home Screen", run: () => { F.apps = F.apps.filter(x => x !== id); collapseFolder(fid); placeApp(id); renderHome(); close(); } }, { label: "Open", run: () => { close(); open(id); } }] }); }, 500); });
+    c.addEventListener("pointerup", () => { if (t !== -1) { clearTimeout(t); close(); setTimeout(() => open(id), 260); } });
+    return c;
+  }));
+  const { close } = overlay(h("div", title, grid));
 }
 
 /* ---------- widgets ---------- */
@@ -364,6 +411,9 @@ function applySettings(k) {
   screen.classList.toggle("dark", dark);
   screen.style.setProperty("--glass", S.reduceTransparency ? 1 : S.glass / 100);
   screen.classList.toggle("reduce", S.reduceMotion);
+  screen.classList.toggle("icons-dark", S.iconStyle === "dark" || (S.iconStyle === "auto" && dark));
+  screen.classList.toggle("icons-tinted", S.iconStyle === "tinted");
+  screen.style.setProperty("--icon-hue", (S.iconTint || 210) + "deg");
   $("#dim").style.opacity = state.awake ? (1 - S.brightness) * .72 : 1;
   screen.style.filter = S.nightShift ? "sepia(.25) saturate(1.1) hue-rotate(-12deg)" : "";
   screen.style.fontWeight = S.boldText ? 600 : "";
@@ -407,11 +457,12 @@ function renderHome() {
     pagesEl.append(pg);
   });
   pagesEl.append(libraryPage());
-  dockEl.innerHTML = ""; L.dock.forEach(id => apps[id] && dockEl.append(cellEl(apps[id], "dock")));
+  dockEl.innerHTML = ""; L.dock.forEach(id => id.startsWith("f:") ? dockEl.append(folderCell(id.slice(2), "dock")) : apps[id] && dockEl.append(cellEl(apps[id], "dock")));
   renderDots(); setPage(state.page, false);
   homeEl.classList.toggle("jiggle", state.jiggle);
 }
 function itemEl(it, where, pi) {
+  if (it.startsWith("f:")) return folderCell(it.slice(2), where);
   if (it.startsWith("w:")) {
     const w = WIDGETS[it.slice(2)]; if (!w) return h("div");
     const el = w.render(); el.dataset.item = it; if (w.size === "wide") el.classList.add("w4");
@@ -445,7 +496,7 @@ function todayPage() {
     h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" } }, L.map(k => { const w = WIDGETS[k]; const el = w.render(); if (w.size === "wide") el.style.gridColumn = "span 2"; return el; })),
     h("button.glass", { style: { alignSelf: "center", minHeight: "44px", padding: "0 22px", borderRadius: "22px", fontSize: "15px", fontWeight: 600, color: "var(--tint-ink)" }, onclick: () => widgetGallery(true) }, "Edit Widgets"));
 }
-const LIB_CATS = [["Suggestions", null], ["Recently Added", null], ["Social", "Social"], ["Utilities", "Utilities"], ["Productivity & Finance", "Productivity"], ["Creativity", "Creativity"], ["Entertainment", "Entertainment"], ["Information & Reading", "Information"], ["Health & Fitness", "Health"], ["Games", "Games"]];
+const LIB_CATS = [["Suggestions", null], ["Recently Added", null], ["Android Apps", "Android"], ["Social", "Social"], ["Utilities", "Utilities"], ["Productivity & Finance", "Productivity"], ["Creativity", "Creativity"], ["Entertainment", "Entertainment"], ["Information & Reading", "Information"], ["Health & Fitness", "Health"], ["Games", "Games"]];
 function libraryPage() {
   const all = Object.values(apps).filter(a => isInstalled(a.id) && !a.hidden);
   const folders = LIB_CATS.map(([name, cat]) => {
@@ -457,7 +508,7 @@ function libraryPage() {
   const search = h("input", { placeholder: "App Library", style: { border: 0, outline: 0, background: "none", flex: 1, color: "#fff", fontSize: "16px" },
     oninput: () => { const q = search.value.toLowerCase(); listView.style.display = "flex"; grid.style.display = "none"; listView.innerHTML = "";
       all.filter(a => a.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name)).forEach(a => listView.append(h("div.lib-row", { onclick: ev => open(a.id, ev.currentTarget.querySelector(".icon")) }, iconEl(a), a.name))); },
-    onfocus: () => search.oninput(), onblur: () => setTimeout(() => { if (!search.value) { listView.style.display = "none"; grid.style.display = "grid"; } }, 200) });
+    onfocus: () => search.dispatchEvent(new Event("input")), onblur: () => setTimeout(() => { if (!search.value) { listView.style.display = "none"; grid.style.display = "grid"; } }, 200) });
   const grid = h("div.lib-grid", folders.map(f => {
     const big = f.list.slice(0, 3), rest = f.list.slice(3);
     const fold = h("div.lib-folder", big.map(a => { const ic = iconEl(a); ic.onclick = () => open(a.id, ic); return ic; }),
@@ -535,7 +586,7 @@ function iconPress(e, cell, id, where) {
   e.stopPropagation();
   const ic = cell.querySelector(".icon") || cell;
   ic.classList.add("pressed");
-  let longFired = false, dragging = false, ghost = null, edgeTimer = 0;
+  let longFired = false, dragging = false, ghost = null, edgeTimer = 0, hoverT = 0, reorderT = 0, lastDragP = null;
   pressTimer = setTimeout(() => {
     longFired = true; ic.classList.remove("pressed"); haptic(12);
     if (!state.jiggle) iconMenu(cell, id);
@@ -556,7 +607,11 @@ function iconPress(e, cell, id, where) {
         if (!dragging) { dragging = true; ghost = cell.cloneNode(true); ghost.id = "dragGhost"; ghost.classList.remove("dragging"); screen.append(ghost); cell.classList.add("dragging"); }
         const r = cell.getBoundingClientRect(); // eslint-disable-line no-unused-vars
         ghost.style.left = (p.x - 40) + "px"; ghost.style.top = (p.y - 40) + "px"; ghost.style.width = "80px";
-        reorderAt(p, id);
+        const hover = folderTargetAt(p, id);
+        if (hover !== folderHover) { clearTimeout(hoverT); $$(".cell.merge", homeEl).forEach(c => c.classList.remove("merge")); folderHover = null;
+          if (hover) hoverT = setTimeout(() => { folderHover = hover; $(`.cell[data-item="${hover}"]`, homeEl)?.classList.add("merge"); haptic(8); }, 350); }
+        // reorder only once the finger rests (220 ms), so passing over icons on the way to a folder target doesn't shuffle them
+        clearTimeout(reorderT); lastDragP = { ...p }; if (!hover) { const at = { ...p }; reorderT = setTimeout(() => { if (dragging) reorderAt(at, id); }, 220); }
         clearTimeout(edgeTimer);
         if (p.x < 18 || p.x > W - 18) edgeTimer = setTimeout(() => { setPage(state.page + (p.x < 18 ? -1 : 1)); }, 550);
       }
@@ -565,14 +620,30 @@ function iconPress(e, cell, id, where) {
       clearTimeout(pressTimer); clearTimeout(edgeTimer); ic.classList.remove("pressed");
       if (pageDrag) { const proj = pageX + project(vx, .99); setPage(clamp(Math.round(-proj / W) - 1, startPage - 1, startPage + 1), true, vx); return; }
       if (!longFired && !state.jiggle && dy > 30 && where === "page") { if (dy + project(vy) > 90) openSpotlight(); else spotlightPull(0, true); return; }
-      if (dragging) { ghost.remove(); renderHome(); persist(); return; }
+      clearTimeout(hoverT); clearTimeout(reorderT);
+      if (dragging && !folderHover && lastDragP) { ghost.style.display = "none"; reorderAt(lastDragP, id); }
+      if (dragging) { ghost.remove(); const target = folderHover; folderHover = null; if (target) { const fid = mergeIntoFolder(id, target); renderHome(); setTimeout(() => openFolder(fid), 120); } else { renderHome(); persist(); } return; }
       if (!info.moved && !longFired && !state.jiggle) {
         if (id.startsWith("w:")) return;
+        if (id.startsWith("f:")) return openFolder(id.slice(2));
         if (installing[id] != null) return toast("Downloading…");
         open(id, ic);
       }
     },
   });
+}
+let folderHover = null;
+/* the item whose icon centre the finger is over (inner 60% of the icon), if it can take this app */
+function folderTargetAt(p, id) {
+  if (id.startsWith("w:") || id.startsWith("f:")) return null;
+  const ghost = $("#dragGhost"); if (ghost) ghost.style.display = "none";
+  const sr = screen.getBoundingClientRect();
+  const under = document.elementFromPoint(sr.left + p.x * scale, sr.top + p.y * scale);
+  if (ghost) ghost.style.display = "";
+  const cell = under && under.closest(".cell[data-item]"); if (!cell || cell.dataset.item === id || cell.dataset.item.startsWith("w:")) return null;
+  const r = cell.querySelector(".icon").getBoundingClientRect();
+  const cx = (r.left + r.width / 2 - sr.left) / scale, cy = (r.top + r.height / 2 - sr.top) / scale;
+  return Math.abs(p.x - cx) < r.width / scale * .3 && Math.abs(p.y - cy) < r.height / scale * .3 ? cell.dataset.item : null;
 }
 function reorderAt(p, id) {
   const L = layout();
@@ -617,12 +688,16 @@ function widgetGallery(today) {
   if (today) items.push({ label: "Reset Today View", red: true, run: () => { delete saved.today; persist(); renderHome(); } });
   sheet({ title: "Add a widget", actions: items });
 }
+const P = () => (window.GOS && GOS.platform) || {};
 function iconMenu(cell, id) {
   const a = apps[id];
   const acts = [];
   if (a && a.quick) a.quick.forEach(q => acts.push({ label: q.label, run: () => { open(id); setTimeout(() => q.run(), 450); } }));
   acts.push({ label: "Edit Home Screen", run: enterJiggle });
-  if (a) acts.push({ label: "Share App", run: () => share({ title: a.name, text: `${a.name} on Glassline OS` }) });
+  if (a && a.native && P().appInfo) acts.push({ label: "App Info", run: () => P().appInfo(a) });
+  else if (a) acts.push({ label: "Share App", run: () => share({ title: a.name, text: `${a.name} on Glassline OS` }) });
+  if (id.startsWith("f:")) { const fid = id.slice(2); acts.unshift({ label: "Rename", run: () => prompt_("Rename Folder", folders()[fid].name).then(v => { if (v && v.trim()) { folders()[fid].name = v.trim(); persist(); renderHome(); } }) });
+    acts.push({ label: "Remove Folder", red: true, run: () => { const ids = folders()[fid].apps.slice(); folders()[fid].apps = []; collapseFolder(fid); ids.forEach(placeApp); renderHome(); toast("Apps moved to the Home Screen"); } }); }
   if (id.startsWith("w:")) acts.push({ label: "Remove Widget", red: true, run: () => { unplace(id); renderHome(); } });
   else if (a && a.removable) acts.push({ label: "Remove App", red: true, run: () => askRemove(id) });
   ctxMenu(cell, acts);
@@ -630,7 +705,8 @@ function iconMenu(cell, id) {
 function askRemove(id) {
   const a = apps[id];
   const acts = [];
-  if (!a.builtin || a.removable) acts.push({ label: a.builtin ? "Delete App" : "Delete App", red: true, run: () => confirmDelete(id) });
+  if (a.native) { if (P().uninstall) acts.push({ label: "Delete App", red: true, run: () => P().uninstall(a) }); }
+  else if (!a.builtin || a.removable) acts.push({ label: "Delete App", red: true, run: () => confirmDelete(id) });
   acts.push({ label: "Remove from Home Screen", run: () => { unplace(id); renderHome(); toast("Moved to App Library"); } });
   sheet({ title: `Remove “${a.name}”?`, message: "Removing from Home Screen keeps the app in App Library.", actions: acts });
 }
@@ -676,7 +752,7 @@ function rectOf(el) {
   const r = el.getBoundingClientRect(), s = screen.getBoundingClientRect();
   return { x: (r.left - s.left) / scale, y: (r.top - s.top) / scale, w: r.width / scale, h: r.height / scale, r: 15 };
 }
-const FULL = { x: 0, y: 0, w: W, h: H, r: 56 };
+let FULL = { x: 0, y: 0, w: W, h: H, r: 56 };
 const lerpRect = (a, b, t) => ({ x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), w: lerp(a.w, b.w, t), h: lerp(a.h, b.h, t), r: lerp(a.r, b.r, t) });
 function applyRect(win, r) {
   const sx = r.w / W, sy = r.h / H;
@@ -711,6 +787,7 @@ function makeCtx(a, appEl, win) {
 }
 async function open(id, fromEl, opts = {}) {
   const a = apps[id]; if (!a) return toast("App not found");
+  if (a.launch) { closeOverlays(); a.launch(); return; }
   if (!isInstalled(id)) { open("store"); setTimeout(() => emit("store-show", id), 500); return; }
   if (state.locked) { pendingOpen = id; return unlockFlow(); }
   closeOverlays();
@@ -938,7 +1015,7 @@ function makeStack(host, rootFn) {
 /* ======================================================================== */
 /*  Cover sheet: lock screen and Notification Centre                         */
 /* ======================================================================== */
-let pendingOpen = null, pendingIntent = null;
+let pendingOpen = null, pendingIntent = null, pendingNative = null;
 function renderLock() {
   const d = new Date();
   $("#lockClock").textContent = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M/i, "");
@@ -993,6 +1070,7 @@ async function finishUnlock() {
   if (!state.front) spring("unlockHome", 0, 1, { response: .45, damping: .9 }, t => { homeEl.style.transform = `scale(${lerp(1.1, 1, t)})`; homeEl.style.opacity = clamp(t, 0, 1); }).then(() => { homeEl.style.transform = ""; homeEl.style.opacity = ""; });
   else { homeEl.style.transform = ""; homeEl.style.opacity = ""; const w = state.windows[state.front]; if (w && w.ctx.hooks.show) w.ctx.hooks.show(); }
   statusInk(); emit("unlock");
+  if (pendingNative) { const n = pendingNative; pendingNative = null; setTimeout(() => P().openNotification(n), 120); }
   if (pendingOpen) { const id = pendingOpen, intent = pendingIntent; pendingOpen = pendingIntent = null; setTimeout(() => open(id, null, { intent }), 120); }
 }
 let pcEntry = "";
@@ -1049,7 +1127,7 @@ function topPointer(e) {
   if (e.button > 0 || !state.booted) return;
   const p = local(e);
   if (p.y > 46) return;
-  if (e.target.closest("#island")) return;
+  if (e.target.closest("#island, #banners .ntf")) return;   // banners and the island handle their own taps and drags
   e.stopPropagation(); e.preventDefault();
   const right = p.x > W * .62;
   if (right) {
@@ -1093,7 +1171,8 @@ function ntfEl(n, opts = {}) {
         el.style.transform = "";
         if (!info.moved) {
           if (opts.banner) el.remove(); clearNtf(n.id);
-          if (n.app === "messages" || n.open !== false) {
+          if (n.native && P().openNotification) { if (state.locked) { pendingNative = n; unlockFlow(); } else { coverHide(); P().openNotification(n); } }
+          else if (n.app === "messages" || n.open !== false) {
             if (state.locked) { pendingOpen = n.app; pendingIntent = n.intent; unlockFlow(); }
             else { coverHide(); open(n.app, null, { intent: n.intent }); }
           }
@@ -1105,6 +1184,7 @@ function ntfEl(n, opts = {}) {
 function clearNtf(id) {
   const n = saved.notifications.find(x => x.id === id);
   saved.notifications = saved.notifications.filter(x => x.id !== id); persist();
+  if (n && n.native && P().cancelNotification) P().cancelNotification(n);
   if (n && badges[n.app]) badges[n.app]--;
   renderNC();
 }
@@ -1186,7 +1266,7 @@ function ccProgress(p, animate) {
 function ccClose() { spring("cc", 1, 0, { response: .3, damping: 1 }, t => { ccEl.style.opacity = t; $("#ccGrid").style.transform = `scale(${lerp(.9, 1, t)})`; }).then(() => { ccEl.classList.remove("on"); state.ccOpen = false; statusInk(); }); }
 function renderCC() {
   const g = $("#ccGrid"); g.innerHTML = "";
-  const tog = (key, icon, color, label) => h("button.ccm.r" + (S[key] ? ".on." + color : ""), { title: label, html: sys(icon), onclick: e => { e.stopPropagation(); set(key, !S[key]); if (key === "airplane" && S.airplane) { set("wifi", false); set("cellular", false); set("bluetooth", false); } haptic(); renderCC(); toast(`${label} ${S[key] ? "On" : "Off"}`); } });
+  const tog = (key, icon, color, label) => h("button.ccm.r" + (S[key] ? ".on." + color : ""), { title: label, html: sys(icon), onclick: e => { e.stopPropagation(); if (P().toggle && P().toggle(key)) { ccClose(); return; } set(key, !S[key]); if (key === "airplane" && S.airplane) { set("wifi", false); set("cellular", false); set("bluetooth", false); } haptic(); renderCC(); toast(`${label} ${S[key] ? "On" : "Off"}`); } });
   const conn = h("div.ccm.cc-conn", tog("airplane", "plane", "orange", "Airplane Mode"), tog("cellular", "cell", "green", "Cellular Data"), tog("wifi", "wifi", "blue", "Wi-Fi"), tog("bluetooth", "bt", "blue", "Bluetooth"));
   const m = media.state();
   const music = h("div.ccm.cc-music", h("div", h("div.ttl", m.title || "Not Playing"), h("div.art", m.artist || "Music")),
@@ -1211,13 +1291,28 @@ function renderCC() {
     small("rec", "Screen Recording", () => toast("Screen recording isn't available in the browser")), small("hotspot", "Personal Hotspot", () => set("hotspot", !S.hotspot), S.hotspot, "green"),
     small("drop", "Glass Material: tap to cycle", () => { const order = [10, 55, 100]; const i = order.findIndex(v => v >= S.glass); set("glass", order[(i + 1) % 3]); toast(`Glass ${S.glass < 30 ? "Clear" : S.glass < 80 ? "Default" : "Tinted"}`); }),
     small("scan", "Code Scanner", () => { ccClose(); open("camera", null, { intent: { mode: "scan" } }); }),
+    small("clock", "StandBy", () => { ccClose(); setTimeout(() => standby(true), 300); }),
   );
 }
 function focusMenu() {
   sheet({ title: "Focus", actions: [...["Do Not Disturb", "Sleep", "Personal", "Work", "Driving"].map(f => ({ label: f + (S.focus === f ? " ✓" : ""), run: () => { set("focus", S.focus === f ? null : f); renderCC(); toast(S.focus ? `${f} on` : `Focus off`); } })), ...(S.focus ? [{ label: "Turn Off Focus", red: true, run: () => { set("focus", null); renderCC(); } }] : [])] });
 }
+/* StandBy: a landscape night-stand view with a large clock and glanceable widgets */
+let standbyT = 0;
+function standby(on = true) {
+  $("#standby")?.remove(); clearInterval(standbyT); if (!on) return;
+  closeOverlays();
+  const clock = h("div.sb-clock"), side = h("div.sb-side");
+  const draw = () => { const d = new Date(), night = d.getHours() >= 22 || d.getHours() < 6, w = weatherNow(), ev = nextEvent();
+    clock.textContent = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M/i, "");
+    el.classList.toggle("night", night);
+    side.innerHTML = ""; side.append(h("div.sb-card", h("div.sb-dow", d.toLocaleDateString(undefined, { weekday: "long" })), h("div.sb-num", d.getDate()), h("div.sb-sub", ev ? `${ev.time} ${ev.title}` : "No more events")),
+      h("div.sb-card", h("div.sb-sub", w.city), h("div.sb-num", w.temp + "°"), h("div.sb-sub", `${w.cond} · H:${w.hi}° L:${w.lo}°`))); };
+  const el = h("div#standby", { role: "dialog", "aria-label": "StandBy. Tap to exit.", onclick: () => standby(false) }, h("div.sb-rot", clock, side));
+  screen.append(el); draw(); standbyT = setInterval(draw, 10000);
+}
 let torchOn = false;
-function torch(on) { torchOn = on; $("#torchLight").classList.toggle("on", on); $("#lockTorch").classList.toggle("on", on); live.update(); }
+function torch(on) { if (P().torch && P().torch(on) === false) { toast("This phone has no flashlight"); return; } torchOn = on; $("#torchLight").classList.toggle("on", on); $("#lockTorch").classList.toggle("on", on); live.update(); }
 let hudT = 0;
 function hud(v) { const el = $("#hud"); el.innerHTML = `<i style="height:${v * 100}%"></i>`; el.classList.add("on"); clearTimeout(hudT); hudT = setTimeout(() => el.classList.remove("on"), 1200); }
 
@@ -1497,6 +1592,8 @@ function matchIntent(raw) {
   if ((m = q.match(/^(?:install|download|get)\s+(.+)$/))) { const a = findApp(m[1]); if (a) return { name: "install", app: a.id, describe: `Get ${a.name}` }; }
   if ((m = q.match(/^(?:open|launch|start|show|go to)\s+(?:the\s+)?(.+?)(?:\s+app)?$/))) { const a = findApp(m[1]); if (a) return { name: "open", app: a.id, describe: `Open ${a.name}` }; if (/home/.test(m[1])) return { name: "home", describe: "Go home" }; if (/control/.test(m[1])) return { name: "cc", describe: "Open Control Centre" }; if (/notification/.test(m[1])) return { name: "nc", describe: "Show notifications" }; }
   if (/^(go )?home$/.test(q)) return { name: "home", describe: "Go home" };
+  if (/stand ?by|nightstand|bedside clock/.test(q)) return { name: "standby", describe: "Start StandBy" };
+  if ((m = raw.match(/^run (?:the )?(?:shortcut )?(.+?)(?: shortcut)?$/i))) return { name: "shortcut", which: m[1], describe: `Run shortcut “${m[1]}”` };
   if (/^lock( (the )?(phone|screen))?$/.test(q)) return { name: "lock", describe: "Lock the phone" };
   if (/(app )?switcher|recent apps|multitask/.test(q)) return { name: "switcher", describe: "Show the app switcher" };
   if ((m = q.match(/^(?:search(?: for)?|find|look up)\s+(.+)$/))) return { name: "search", q: m[1], describe: `Search for ${m[1]}` };
@@ -1542,6 +1639,8 @@ function runIntent(it) {
     case "install": install(it.app); return say(`Getting ${apps[it.app].name}. It will appear on your Home Screen.`);
     case "open": closeAssistant(); return open(it.app);
     case "home": closeAssistant(); return goHome();
+    case "standby": closeAssistant(); return standby(true);
+    case "shortcut": { const ok = emit("run-shortcut", it.which); return say(`Running “${it.which}”.`); }
     case "lock": closeAssistant(); return lock();
     case "switcher": closeAssistant(); return showSwitcher();
     case "cc": closeAssistant(); return openCC();
@@ -1646,7 +1745,21 @@ async function boot() {
 }
 
 /* ---------- fit the device to the window ---------- */
+const APP_MODE = new URLSearchParams(location.search).has("app") || !!window.glasslineDesktop;
+const ANDROID = /[?&]android=1/.test(location.search);
 function fit() {
+  if (ANDROID) { // Android app: no device frame; the logical screen is 393 wide and as tall as the phone's ratio
+    document.body.classList.add("full", "android"); const frame = $("#frame");
+    H = Math.max(700, Math.round(W * innerHeight / innerWidth)); FULL = { x: 0, y: 0, w: W, h: H, r: 0 };
+    document.documentElement.style.setProperty("--H", H + "px");
+    scale = innerWidth / W; screen.style.transform = `scale(${scale})`; screen.style.transformOrigin = "0 0";
+    Object.assign(frame.style, { width: innerWidth + "px", height: innerHeight + "px", margin: "0", transform: "" }); return;
+  }
+  document.body.classList.toggle("app", APP_MODE);
+  if (APP_MODE) { // desktop app: the window is the device; scale the frame to fill it
+    document.body.classList.remove("full"); const frame = $("#frame"); screen.style.transform = "";
+    const s = Math.min(innerWidth / (W + 34), innerHeight / (H + 34)); frame.style.transform = `scale(${s})`; scale = s; return;
+  }
   const full = innerWidth < 500 || new URLSearchParams(location.search).has("full");
   document.body.classList.toggle("full", full);
   const frame = $("#frame");
@@ -1674,6 +1787,9 @@ function start() {
   screen = $("#screen"); homeEl = $("#home"); pagesEl = $("#pages"); dockEl = $("#dock"); dotsEl = $("#dots"); winsEl = $("#windows");
   coverEl = $("#cover"); ccEl = $("#cc"); islandEl = $("#island");
   coverEl.prepend(h("div.bg"));
+  const known = new Set(saved.knownApps || []);
+  if (saved.knownApps) Object.values(apps).filter(a => a.builtin && !a.hidden && !known.has(a.id) && isInstalled(a.id)).forEach(a => placeApp(a.id));
+  saved.knownApps = Object.keys(apps); persist();
   addEventListener("resize", fit); fit();
   applySettings(); renderStatus(); renderHome();
   // pad
@@ -1710,17 +1826,27 @@ function start() {
   setInterval(tick, 1000);
   setInterval(() => { if (state.mode === "home") $$(".w-clock", homeEl).forEach(el => el.innerHTML = analogClock(130)); }, 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
-  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http") && !/android=1/.test(location.search)) navigator.serviceWorker.register("sw.js").catch(() => {});
   boot();
 }
 
 window.GOS = {
-  W, H, h, $, $$, sys, svg, G, SYS, esc, clamp, lerp, sleep, spring, project, rubber, track, haptic, tone, SOUND,
+  W, get H() { return H; }, h, $, $$, sys, wake: () => wake(), svg, G, SYS, esc, clamp, lerp, sleep, spring, project, rubber, track, haptic, tone, SOUND,
   registerApp, apps, iconEl, open, goHome, closeApp, lock, unlockFlow, install, uninstall, isInstalled, placeApp,
   notify, toast, sheet, alert: alertBox, prompt: prompt_, share, ctxMenu, overlay, hud, torch: v => torch(v), get torchOn() { return torchOn; },
   settings: S, set, on, emit, appStore, media, battery, live, startTimer, stopTimer, timerState, recState, callState, fmtDur,
   weatherNow, setWeather, WALLPAPERS, wallpaperCSS, WIDGETS, summarize, matchIntent, runIntent, handleAsk, openAssistant, openSpotlight, openCC, openNC, showSwitcher,
-  screenEntities, setBadge, badges, state, saved, persist, layout, renderHome, index, calcAnswer, start, boot, makeStack, asChip, findApp,
+  screenEntities, setBadge, standby, folders, openFolder, mergeIntoFolder, badges, state, saved, persist, layout, renderHome, index, calcAnswer, start, boot, makeStack, asChip, findApp,
   reset() { localStorage.removeItem(KEY); location.reload(); },
+  androidBack() {
+    if (state.locked) return false;
+    const layer = $("#sheetLayer"); if (layer.children.length) { const s = layer.querySelector(".scrim"); if (s) s.click(); return true; }
+    if (assistantOn || state.spotlight || state.ccOpen || coverEl.classList.contains("on") || ctxEl) { closeOverlays(); return true; }
+    if (state.jiggle) { exitJiggle(); return true; }
+    if (state.front) { const w = state.windows[state.front]; const back = w && [...w.appEl.querySelectorAll(".scr")].pop()?.querySelector(".nav .btn"); if (back && w.appEl.querySelectorAll(".scr").length > 1) { back.click(); return true; } goHome(); return true; }
+    if (state.mode === "switcher") { goHome(); return true; }
+    if (state.page !== 0) { setPage(0); return true; }
+    return false;
+  },
 };
 })();

@@ -1,0 +1,69 @@
+{
+  "name": "glassline-os",
+  "productName": "Glassline OS",
+  "version": "27.0.0",
+  "description": "An original iOS-style phone OS that runs as a desktop app.",
+  "main": "desktop/main.js",
+  "author": "Glassline",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node tests/phone.e2e.js",
+    "dist": "electron-builder",
+    "dist:linux": "electron-builder --linux",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "app.glassline.os",
+    "productName": "Glassline OS",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "desktop/**/*",
+      "phone/**/*",
+      "!phone/start.*",
+      "!phone/*.md",
+      "build/icon.png",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "extendInfo": {
+        "NSCameraUsageDescription": "Camera, Video and Magnifier use your camera.",
+        "NSMicrophoneUsageDescription": "Voice Memos records from your microphone."
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "maintainer": "Glassline",
+      "desktopName": "glassline-os.desktop",
+      "syncDesktopName": true
+    }
+  }
+}

@@ -92,6 +92,8 @@ body.full #screen { border-radius: 0; }
   box-shadow: inset 0 0 0 .5px rgba(255,255,255,.35), inset 0 1.5px 0 rgba(255,255,255,.35), 0 2px 6px rgba(0,0,0,.15); transition: transform .18s; }
 .icon::after { content: ""; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,.28), rgba(255,255,255,0) 45%); pointer-events: none; }
 .icon svg { width: 62%; height: 62%; position: relative; z-index: 1; }
+.icon.native::after { display: none; }
+.icon.native { box-shadow: 0 2px 6px rgba(0,0,0,.15); }
 .icon.pressed { transform: scale(.9); filter: brightness(.85); }
 .badge { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--red); color: #fff;
   font-size: 13px; font-weight: 600; display: grid; place-items: center; z-index: 3; }
@@ -408,3 +410,41 @@ body.full #screen { border-radius: 0; }
 
 /* placeholders use the secondary text token so they keep 4.5:1 contrast in both modes */
 #screen input::placeholder, #screen textarea::placeholder { color: var(--ink3); opacity: 1; }
+
+/* ---------- folders ---------- */
+.icon.folder { background: rgba(255,255,255, calc(.22 + var(--glass) * .2)); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 7px; place-items: stretch; }
+.icon.folder .icon { width: auto; height: auto; aspect-ratio: 1; border-radius: 3.5px; box-shadow: none; }
+.icon.folder .icon svg { width: 70%; height: 70%; }
+.cell.merge .icon { transform: scale(1.18); box-shadow: 0 0 0 3px rgba(255,255,255,.55); }
+.folder-open { position: absolute; left: 34px; right: 34px; top: 210px; border-radius: 38px; padding: 24px 18px; display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 18px 10px; max-height: 440px; overflow-y: auto; pointer-events: auto; }
+.folder-open .cell { cursor: pointer; }
+.folder-open .lbl { color: var(--tint-ink); text-shadow: none; }
+/* ---------- icon appearance (Settings > Home Screen) ---------- */
+.icons-dark #home .icon:not(.folder), .icons-dark #spotlight .icon, .icons-dark .lib-folder .icon { background: linear-gradient(#3a3a3c, #1c1c1e) !important; }
+.icons-tinted #home .icon:not(.folder), .icons-tinted #spotlight .icon, .icons-tinted .lib-folder .icon { filter: grayscale(1) sepia(1) hue-rotate(calc(var(--icon-hue) - 50deg)) saturate(2.4) brightness(.92); }
+/* ---------- StandBy ---------- */
+#standby { position: absolute; inset: 0; z-index: 96; background: #000; color: #fff; overflow: hidden; cursor: pointer; }
+#standby .sb-rot { position: absolute; width: var(--H); height: var(--W); left: calc((var(--W) - var(--H)) / 2); top: calc((var(--H) - var(--W)) / 2);
+  transform: rotate(90deg); display: flex; align-items: center; gap: 28px; padding: 0 60px; }
+.sb-clock { font-size: 150px; font-weight: 600; letter-spacing: -4px; font-variant-numeric: tabular-nums; flex: 1; line-height: 1; }
+.sb-side { display: flex; flex-direction: column; gap: 14px; width: 220px; }
+.sb-card { background: #1c1c1e; border-radius: 26px; padding: 14px 18px; }
+.sb-dow { color: #ff453a; font-weight: 600; font-size: 14px; } .sb-num { font-size: 46px; font-weight: 300; line-height: 1.1; } .sb-sub { font-size: 13px; color: #a1a1a6; }
+#standby.night { color: #ff3b30; } #standby.night .sb-card { background: #1a0000; } #standby.night .sb-dow, #standby.night .sb-sub { color: #b3261e; }
+
+/* desktop app (Electron): transparent window shaped by the device frame; drag the bezel to move it */
+body.app, body.app #stage { background: transparent; }
+body.app #help { display: none; }
+body.app #frame { -webkit-app-region: drag; }
+body.app #screen, body.app .hw { -webkit-app-region: no-drag; }
+
+/* no desktop scrollbars inside the device; scrolling still works by wheel, trackpad and drag */
+#screen * { scrollbar-width: none; }
+#screen *::-webkit-scrollbar { display: none; }
+
+/* Android app: the page is the phone screen */
+body.android #stage { display: block; }
+body.android #help { display: none; }
+body.android #frame { position: fixed; left: 0; top: 0; }

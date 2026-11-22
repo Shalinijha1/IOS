@@ -182,6 +182,71 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "PASS" : "FAIL"}  $
   await page.reload(); await page.waitForFunction(() => window.GOS && GOS.state.booted, null, { timeout: 8000 });
   check("settings and layout persist across reloads", await page.evaluate(() => GOS.settings.passcode === "1234" && GOS.layout().pages[0].indexOf("maps") < 5));
 
+  // 16. Folders: drag one app onto the middle of another in edit mode (clear the passcode set in section 14 first)
+  await page.evaluate(() => { GOS.set("passcode", ""); GOS.set("faceUnlock", true); GOS.unlockFlow(); }); await page.waitForTimeout(800);
+  check("unlocked again before the folder test", !(await st()).locked);
+  await page.evaluate(() => { GOS.state.page = 0; GOS.renderHome(); }); await page.waitForTimeout(300);
+  const pin = async sel => { const b = await (await page.$(sel)).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+  const [sx, sy] = await pin('#pages .cell[data-item="weather"] .icon'); const [tx, ty] = await pin('#pages .cell[data-item="clock"] .icon');
+  await page.mouse.move(sx, sy); await page.mouse.down(); await page.waitForTimeout(650);
+  for (let i = 1; i <= 14; i++) { await page.mouse.move(sx + (tx - sx) * i / 14, sy + (ty - sy) * i / 14); await page.waitForTimeout(25); }
+  await page.waitForTimeout(600); await page.mouse.up(); await page.waitForTimeout(600);
+  const fold = await page.evaluate(() => Object.values(GOS.folders()).find(f => f.apps.includes("weather") && f.apps.includes("clock")));
+  check("dragging an app onto another makes a folder", !!fold, JSON.stringify(fold));
+  check("the new folder opens showing both apps", await page.$$eval(".folder-open .cell", c => c.length) === 2);
+  await shot("folder");
+  await page.mouse.click(box.x + 20 * S, box.y + 820 * S); await page.waitForTimeout(400);
+  await page.evaluate(() => { const fid = Object.keys(GOS.folders()).find(k => GOS.folders()[k].apps.includes("weather")); GOS.folders()[fid].apps = GOS.folders()[fid].apps.filter(a => a !== "weather"); });
+  await page.evaluate(() => { GOS.renderHome(); });
+  await page.click("#doneBtn").catch(() => {});
+
+  // 17. Icon appearance, StandBy, Shortcuts, Screen Time
+  await page.evaluate(() => GOS.set("iconStyle", "tinted"));
+  check("tinted icon mode applies", await page.evaluate(() => document.querySelector("#screen").classList.contains("icons-tinted")));
+  await page.evaluate(() => GOS.set("iconStyle", "default"));
+  await page.evaluate(() => GOS.standby(true)); await page.waitForTimeout(300);
+  check("StandBy shows a large clock", await page.evaluate(() => /\d:\d\d/.test(document.querySelector("#standby .sb-clock").textContent)));
+  await shot("standby");
+  await page.click("#standby"); check("tapping StandBy exits it", !(await page.$("#standby")));
+  await page.evaluate(() => GOS.handleAsk ? null : null);
+  await page.evaluate(() => GOS.emit("run-shortcut", "Focus Sprint")); await page.waitForTimeout(1200);
+  check("running a shortcut performs its actions", await page.evaluate(() => GOS.settings.focus === "Do Not Disturb" && GOS.timerState.end > Date.now() + 24 * 60000));
+  await page.evaluate(() => { GOS.set("focus", null); GOS.stopTimer(); });
+  await page.evaluate(() => GOS.open("calculator", null, { instant: true })); await page.waitForTimeout(3300);
+  await page.evaluate(() => GOS.open("screentime", null, { instant: true })); await page.waitForTimeout(500);
+  check("Screen Time records real use per app", await page.evaluate(() => [...document.querySelectorAll('.win[data-app="screentime"] .row')].some(r => /Calculator/.test(r.textContent))));
+  await shot("screentime");
+  await page.evaluate(() => GOS.goHome()); await page.waitForTimeout(500);
+
+  // 18. Android app: with the native bridge present, installed Android apps appear, launch natively, and Back works
+  const ap = await browser.newPage({ viewport: { width: 393, height: 852 } });
+  ap.on("pageerror", e => errors.push("android: " + e.message));
+  await ap.route(/^https?:\/\/(?!localhost)/, r => r.abort());
+  await ap.addInitScript(() => {
+    const dot = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+    window.__launched = [];
+    window.GlasslineAndroid = {
+      listApps: () => JSON.stringify([{ pkg: "com.example.chess", label: "Chess Pro", icon: dot }, { pkg: "com.example.bank", label: "My Bank", icon: dot }]),
+      launch: pkg => { window.__launched.push(pkg); return true; },
+      isDefaultHome: () => false, chooseHomeApp: () => {}, openSystemSettings: () => {},
+    };
+  });
+  await ap.goto(base.replace("?fast", "?fast&android=1"));
+  await ap.waitForFunction(() => window.GOS && GOS.state.booted, null, { timeout: 8000 });
+  await ap.evaluate(() => GOS.unlockFlow()); await ap.waitForTimeout(1400);
+  await ap.evaluate(() => { const s = document.querySelector("#sheetLayer .scrim"); if (s) s.click(); });   // dismiss the first-run setup sheet
+  await ap.waitForTimeout(400);
+  check("android: installed Android apps are registered", await ap.evaluate(() => !!GOS.apps["android:com.example.chess"] && !!GOS.apps["android:com.example.bank"]));
+  check("android: Android apps are on the Home Screen", await ap.evaluate(() => GOS.layout().pages.flat().includes("android:com.example.chess")));
+  await ap.evaluate(() => GOS.openSpotlight("chess")); await ap.waitForTimeout(300);
+  check("android: Search finds an Android app", await ap.$$eval("#spBody .sp-row .t", r => r.some(x => x.textContent === "Chess Pro")));
+  check("android: Back closes Search", await ap.evaluate(() => GOS.androidBack()) && !(await ap.evaluate(() => GOS.state.spotlight)));
+  await ap.evaluate(() => GOS.open("android:com.example.chess"));
+  check("android: opening an Android app launches it natively", await ap.evaluate(() => window.__launched.includes("com.example.chess") && !GOS.state.front));
+  await ap.evaluate(() => GOS.open("notes", null, { instant: true })); await ap.waitForTimeout(300);
+  check("android: Back from an app goes home", await ap.evaluate(() => GOS.androidBack()) && await ap.waitForFunction(() => !GOS.state.front, null, { timeout: 3000 }).then(() => true, () => false));
+  await ap.close();
+
   check("no page errors", errors.length === 0, errors.join(" | "));
   await browser.close(); server.close();
   console.log(failures ? `\n${failures} failed` : "\nall passed");
