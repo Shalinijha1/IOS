@@ -141,7 +141,7 @@ function appStore(id) {
 
 /* ---------- settings ---------- */
 const DEFAULTS = {
-  appearance: "auto", glass: 55, brightness: 1, volume: .6, wallpaper: 0, lockFont: 0,
+  appearance: "auto", glass: 55, brightness: 1, volume: .6, wallpaper: 8, lockFont: 0,
   wifi: true, bluetooth: true, cellular: true, airplane: false, hotspot: false, silent: false, focus: null, rotationLock: true,
   reduceMotion: false, reduceTransparency: false, nightShift: false, passcode: "", faceUnlock: true, autoLock: 120,
   iconStyle: "default", iconTint: 210,
@@ -416,6 +416,49 @@ const WALLPAPERS = [
   { name: "Nightfall", css: "radial-gradient(80% 50% at 70% 20%, #4b6cb7 0%, transparent 60%), radial-gradient(80% 60% at 20% 70%, #6a3093 0%, transparent 60%), linear-gradient(180deg, #0f0c29, #000)" },
   { name: "Sandstone", css: "linear-gradient(160deg, #f6d365 0%, #fda085 45%, #c0587e 100%)" },
 ];
+/* Scenic wallpapers, painted on the device from code (no photos): layered ridges, a lake, aurora, dunes and glass shapes.
+   Deterministic, so every phone paints the same picture. */
+function paintScene(kind) {
+  const w = 720, hh = 1560, c = document.createElement("canvas"); c.width = w; c.height = hh; const g = c.getContext("2d");
+  let seed = { summit: 7, lake: 21, aurora: 5, dunes: 13, bloom: 31 }[kind] || 1; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const sky = (stops) => { const gr = g.createLinearGradient(0, 0, 0, hh); stops.forEach(([o, col]) => gr.addColorStop(o, col)); g.fillStyle = gr; g.fillRect(0, 0, w, hh); };
+  const glow = (x, y, r, col) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, col); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, hh); };
+  const ridge = (base, amp, rough, col, mirror) => {   // midpoint-displacement mountain line
+    let pts = [[0, base + (rnd() - .5) * amp], [w, base + (rnd() - .5) * amp]];
+    for (let d = amp; d > 2; d *= rough) { const next = []; for (let i = 0; i < pts.length - 1; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[i + 1]; next.push(pts[i], [(x1 + x2) / 2, (y1 + y2) / 2 + (rnd() - .5) * d]); } next.push(pts[pts.length - 1]); pts = next; }
+    g.fillStyle = col; g.beginPath(); g.moveTo(0, hh); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(w, hh); g.fill();
+    if (mirror) { g.save(); g.globalAlpha = .35; g.beginPath(); g.moveTo(0, mirror); pts.forEach(([x, y]) => g.lineTo(x, 2 * mirror - y)); g.lineTo(w, mirror); g.fill(); g.restore(); }
+  };
+  if (kind === "summit") {
+    sky([[0, "#1b2a4a"], [.35, "#5d6fa3"], [.55, "#f2a885"], [.7, "#f7d7b5"], [1, "#f7d7b5"]]); glow(500, 820, 380, "rgba(255,214,170,.9)");
+    ridge(700, 380, .52, "#7c86a8"); ridge(860, 300, .5, "#57618a"); ridge(1010, 260, .5, "#3b4470"); ridge(1170, 220, .48, "#262c4d"); ridge(1340, 160, .45, "#161a30");
+    const mist = g.createLinearGradient(0, 900, 0, 1200); mist.addColorStop(0, "rgba(255,240,230,0)"); mist.addColorStop(.5, "rgba(255,240,230,.18)"); mist.addColorStop(1, "rgba(255,240,230,0)"); g.fillStyle = mist; g.fillRect(0, 900, w, 300);
+  } else if (kind === "lake") {
+    sky([[0, "#0f1c3f"], [.3, "#3e4f8f"], [.48, "#d97a8b"], [.55, "#f4b18a"], [.56, "#2a3a6a"], [1, "#0c1430"]]); glow(360, 840, 300, "rgba(255,190,150,.75)");
+    ridge(780, 260, .5, "#3c3f72", 870); ridge(830, 160, .48, "#24264d", 870);
+    g.fillStyle = "rgba(255,210,180,.25)"; for (let i = 0; i < 60; i++) { const y = 880 + i * 11 + rnd() * 6, x = 360 + (rnd() - .5) * 260 * (1 + i / 30); g.fillRect(x, y, 40 + rnd() * 120, 2); }
+  } else if (kind === "aurora") {
+    sky([[0, "#020617"], [.6, "#07152e"], [1, "#0b2a3a"]]);
+    for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(255,255,255,${.3 + rnd() * .7})`; g.fillRect(rnd() * w, rnd() * hh * .65, rnd() * 2 + .6, rnd() * 2 + .6); }
+    [["rgba(60,255,170,.45)", 420, 0], ["rgba(120,90,255,.35)", 520, 1.3], ["rgba(60,220,255,.3)", 640, 2.1]].forEach(([col, y, ph]) => {
+      for (let x = 0; x < w; x += 3) { const yy = y + Math.sin(x / 90 + ph) * 70 + Math.sin(x / 33 + ph) * 18; const gr = g.createLinearGradient(0, yy - 260, 0, yy); gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(1, col); g.fillStyle = gr; g.fillRect(x, yy - 260, 3, 260); } });
+    ridge(1250, 200, .5, "#04101f"); ridge(1380, 120, .45, "#020812");
+  } else if (kind === "dunes") {
+    sky([[0, "#f6c58f"], [.4, "#f2a46b"], [1, "#b8583c"]]); glow(560, 430, 260, "rgba(255,245,220,.95)");
+    [[820, "#e48a55"], [960, "#cc6c43"], [1110, "#ad5333"], [1290, "#8a3d26"]].forEach(([y, col], i) => { g.fillStyle = col; g.beginPath(); g.moveTo(0, hh); for (let x = 0; x <= w; x += 8) g.lineTo(x, y + Math.sin(x / (180 + i * 40) + i) * 60 + Math.sin(x / 70 + i * 2) * 12); g.lineTo(w, hh); g.fill(); });
+  } else { // bloom: soft glass shapes floating on pastel light
+    sky([[0, "#dfe7ff"], [.5, "#f4e3f7"], [1, "#ffe9d6"]]); glow(160, 300, 420, "rgba(150,180,255,.55)"); glow(620, 1200, 480, "rgba(255,170,150,.5)");
+    [[230, 520, 190, "#7aa2ff", "#d6e2ff"], [520, 760, 150, "#ff9a8b", "#ffe1d9"], [300, 1080, 230, "#b48cff", "#efe4ff"], [600, 330, 110, "#7fe3d2", "#e3fffa"]].forEach(([x, y, r, dark, light]) => {
+      g.save(); g.shadowColor = "rgba(60,60,120,.25)"; g.shadowBlur = 60; g.shadowOffsetY = 30;
+      const gr = g.createRadialGradient(x - r * .35, y - r * .4, r * .1, x, y, r); gr.addColorStop(0, light); gr.addColorStop(.7, dark); gr.addColorStop(1, dark); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.restore();
+      const hl = g.createRadialGradient(x - r * .4, y - r * .45, 0, x - r * .4, y - r * .45, r * .45); hl.addColorStop(0, "rgba(255,255,255,.8)"); hl.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = hl; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); });
+  }
+  return c.toDataURL("image/jpeg", .86);
+}
+try {
+  [["Summit", "summit"], ["Lakeside", "lake"], ["Aurora", "aurora"], ["Dunes", "dunes"], ["Glass Bloom", "bloom"]].forEach(([name, kind]) =>
+    WALLPAPERS.push({ name, scene: kind, get css() { return this._css || (this._css = `center/cover url("${paintScene(kind)}")`); } }));
+} catch (e) { console.warn("scenic wallpapers unavailable", e); }
 function wallpaperCSS() { const w = S.wallpaper; return typeof w === "string" ? `center/cover url("${w}")` : (WALLPAPERS[w] || WALLPAPERS[0]).css; }
 
 /* ======================================================================== */
@@ -436,7 +479,7 @@ function applySettings(k) {
   $("#dim").style.opacity = state.awake ? (1 - S.brightness) * .72 : 1;
   screen.style.filter = S.nightShift ? "sepia(.25) saturate(1.1) hue-rotate(-12deg)" : "";
   screen.style.fontWeight = S.boldText ? 600 : "";
-  const wp = wallpaperCSS(); $("#wall").style.background = wp;
+  const wp = wallpaperCSS(); $("#wall").style.background = wp; document.documentElement.style.setProperty("--tablet-wall", wp);
   if (coverEl) coverEl.querySelector(".bg").style.background = wp;
   $("#lockClock").className = "f" + (S.lockFont + 1);
   if (!k || ["wifi", "cellular", "airplane", "focus", "silent", "bluetooth", "lowPower"].includes(k)) renderStatus();
@@ -1779,10 +1822,14 @@ const ANDROID = /[?&]android=1/.test(location.search);
 function fit() {
   if (ANDROID) { // Android app: no device frame; the logical screen is 393 wide and as tall as the phone's ratio
     document.body.classList.add("full", "android"); const frame = $("#frame");
-    H = Math.max(700, Math.round(W * innerHeight / innerWidth)); FULL = { x: 0, y: 0, w: W, h: H, r: 0 };
+    // phones: fill the screen at its own ratio. Tablets and wide screens: a full-height phone-shaped screen in the middle
+    // (the area either side shows the wallpaper), so nothing is cut off or stretched.
+    const ratio = innerHeight / innerWidth, tablet = ratio < 1.7;
+    H = tablet ? 852 : Math.max(812, Math.round(W * ratio));   // 812: the shortest screen the Home Screen layout fits FULL = { x: 0, y: 0, w: W, h: H, r: tablet ? 40 : 0 };
     document.documentElement.style.setProperty("--H", H + "px");
-    scale = innerWidth / W; screen.style.transform = `scale(${scale})`; screen.style.transformOrigin = "0 0";
-    Object.assign(frame.style, { width: innerWidth + "px", height: innerHeight + "px", margin: "0", transform: "" }); return;
+    scale = Math.min(innerWidth / W, innerHeight / H); screen.style.transform = `scale(${scale})`; screen.style.transformOrigin = "0 0";
+    document.body.classList.toggle("tablet", tablet);
+    Object.assign(frame.style, { width: W * scale + "px", height: H * scale + "px", margin: "0", transform: "", left: (innerWidth - W * scale) / 2 + "px", top: (innerHeight - H * scale) / 2 + "px" }); return;
   }
   document.body.classList.toggle("app", APP_MODE);
   if (APP_MODE) { // desktop app: the window is the device; scale the frame to fill it

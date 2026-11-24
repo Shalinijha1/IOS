@@ -514,3 +514,8 @@ body.panel #cc { background: rgba(10,12,18,.45); }
 .icons-large #home .page .cell .lbl, .icons-large #dock .cell .lbl { display: none; }
 .icons-large #home .page .cell .icon { width: 74px; height: 74px; border-radius: 17px; }
 .icons-large #home .grid { grid-auto-rows: 92px; align-items: center; }
+
+/* Tablets: the phone-shaped screen sits in the middle with rounded corners; the sides show the wallpaper, softly blurred */
+body.android.tablet { background: #000; }
+body.android.tablet #stage::before { content: ""; position: fixed; inset: -40px; background: var(--tablet-wall, #111); background-size: cover; filter: blur(40px) brightness(.6); }
+body.android.tablet #screen { border-radius: 40px; }
