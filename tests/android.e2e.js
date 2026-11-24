@@ -31,7 +31,7 @@ const BRIDGE = () => {
     ["Budget Buddy", "#0f2027", "#2c5364", "chart"], ["Video Play", "#e52d27", "#b31217", "play"], ["Sky Weather", "#2980b9", "#6dd5fa", "sun"]];
   const icon = (a, b, kind) => {
     const c = document.createElement("canvas"); c.width = c.height = 96; const g = c.getContext("2d");
-    const gr = g.createLinearGradient(0, 0, 96, 96); gr.addColorStop(0, a); gr.addColorStop(1, b); g.fillStyle = gr; g.fillRect(0, 0, 96, 96);
+    if (a) { const gr = g.createLinearGradient(0, 0, 96, 96); gr.addColorStop(0, a); gr.addColorStop(1, b); g.fillStyle = gr; g.fillRect(0, 0, 96, 96); }
     g.fillStyle = "#fff"; g.strokeStyle = "#fff"; g.lineWidth = 7; g.lineCap = g.lineJoin = "round";
     const P = { globe: () => { g.beginPath(); g.arc(48, 48, 26, 0, 7); g.stroke(); g.beginPath(); g.ellipse(48, 48, 11, 26, 0, 0, 7); g.stroke(); g.beginPath(); g.moveTo(22, 48); g.lineTo(74, 48); g.stroke(); },
       coin: () => { g.beginPath(); g.arc(48, 48, 26, 0, 7); g.fill(); g.fillStyle = a; g.font = "bold 34px sans-serif"; g.textAlign = "center"; g.fillText("$", 48, 60); },
@@ -60,7 +60,7 @@ const BRIDGE = () => {
   const rec = (n, ...a) => { calls.push([n, ...a]); };
   window.GlasslineAndroid = {
     listApps() { if (!apps) apps = [...SYS.map(([pkg, label]) => ({ pkg, label, category: -1, system: pkg === "com.android.settings", icon: icon("#999", "#666", "globe") })),
-        ...THIRD.map(([label, a, b, kind], i) => ({ pkg: "com.example." + label.toLowerCase().replace(/[^a-z0-9]/g, ""), label, category: i % 8, system: false, icon: icon(a, b, kind) }))]; return JSON.stringify(apps); },
+        ...THIRD.map(([label, a, b, kind], i) => ({ pkg: "com.example." + label.toLowerCase().replace(/[^a-z0-9]/g, ""), label, category: i % 8, system: false, icon: icon(a, b, kind), mono: i % 3 ? icon(null, null, kind) : undefined }))]; return JSON.stringify(apps); },
     defaultApps() { return JSON.stringify({ dialer: "com.google.android.dialer", sms: "com.google.android.apps.messaging", browser: "com.example.wavebrowser", camera: "com.google.android.GoogleCamera" }); },
     launch(p) { rec("launch", p); return true; }, launchFrom(p, x, y, w, h) { rec("launchFrom", p, x, y, w, h); return true; },
     uninstall(p) { rec("uninstall", p); }, appInfo(p) { rec("appInfo", p); }, torch(on) { rec("torch", on); return true; },
@@ -171,6 +171,19 @@ const BRIDGE = () => {
   await page.evaluate(() => GOS.androidScreen(true)); await page.waitForTimeout(300);
   check("screen on shows the lock screen awake", await page.evaluate(() => GOS.state.awake && document.querySelector("#cover").classList.contains("on")));
   await page.screenshot({ path: path.join(shots, "android-lock.png") });
+
+  // icon appearance: Tinted uses each app's monochrome icon where it has one; Large hides names
+  await page.evaluate(() => { if (GOS.state.locked) GOS.unlockFlow(); }); await page.waitForTimeout(1600);
+  await page.evaluate(() => { document.querySelectorAll("#sheetLayer .scrim").forEach(x => x.click()); document.querySelectorAll("#banners .ntf").forEach(x => x.remove()); });
+  await page.evaluate(() => { GOS.set("iconStyle", "tinted"); GOS.set("iconTint", 200); GOS.goHome(); }); await page.waitForTimeout(700);
+  const tint = await page.evaluate(() => { const el = document.querySelector('.page .cell[data-item="android:com.example.chatmate"] .icon'); const m = el && el.querySelector(".mono");
+    return { has: !!el && el.classList.contains("has-mono"), shown: !!m && getComputedStyle(m).display === "block", filter: el && getComputedStyle(el).filter }; });
+  check("Tinted mode draws an app's own monochrome icon in the tint colour", tint.has && tint.shown && tint.filter === "none", JSON.stringify(tint));
+  await page.screenshot({ path: path.join(shots, "android-tinted.png") });
+  await page.evaluate(() => GOS.set("iconLarge", true)); await page.waitForTimeout(200);
+  check("Large icons hide the app names", await page.evaluate(() => getComputedStyle(document.querySelector(".page .cell .lbl")).display === "none"));
+  await page.screenshot({ path: path.join(shots, "android-large-dark.png") });
+  await page.evaluate(() => { GOS.set("iconStyle", "default"); GOS.set("iconLarge", false); });
 
   // Home Settings: edge swipes and icon packs
   await page.evaluate(() => GOS.androidHome.setEdge(true));

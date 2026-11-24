@@ -250,6 +250,7 @@ function registerApp(def) {
 function iconEl(app, opts = {}) {
   const el = h("div.icon", { style: { background: app.iconUrl ? `#fff center/cover url("${app.iconUrl}")` : app.bg }, dataset: { app: app.id } });
   if (app.iconUrl) el.classList.add("native");
+  if (app.monoUrl) { el.classList.add("has-mono"); el.append(h("i.mono", { style: { webkitMaskImage: `url("${app.monoUrl}")`, maskImage: `url("${app.monoUrl}")` } })); }
   else el.innerHTML = typeof app.glyph === "function" ? app.glyph() : svg(G[app.glyph] || app.glyph, "0 0 24 24") ;
   const svgEl = el.querySelector("svg"); if (svgEl) { svgEl.setAttribute("stroke", "#fff"); svgEl.setAttribute("stroke-width", "1.8"); }
   if (opts.size) Object.assign(el.style, { width: opts.size + "px", height: opts.size + "px", borderRadius: opts.size * .235 + "px" });
@@ -430,6 +431,7 @@ function applySettings(k) {
   screen.classList.toggle("reduce", S.reduceMotion);
   screen.classList.toggle("icons-dark", S.iconStyle === "dark" || (S.iconStyle === "auto" && dark));
   screen.classList.toggle("icons-tinted", S.iconStyle === "tinted");
+  screen.classList.toggle("icons-large", !!S.iconLarge);
   screen.style.setProperty("--icon-hue", (S.iconTint || 210) + "deg");
   $("#dim").style.opacity = state.awake ? (1 - S.brightness) * .72 : 1;
   screen.style.filter = S.nightShift ? "sepia(.25) saturate(1.1) hue-rotate(-12deg)" : "";

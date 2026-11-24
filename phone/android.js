@@ -70,7 +70,7 @@ function sync() {
     const id = aid(x.pkg), known = O.apps[id];
     const t = themeFor(x.pkg), look = t && O.apps[t];
     O.registerApp({ id, name: look ? SYSTEM_NAME[t] : x.label, native: x.pkg, theme: t || undefined, category: look ? look.category : CAT[x.category] || "Utilities",
-      iconUrl: look ? undefined : x.icon, bg: look ? look.bg : "#fff", glyph: look ? look.glyph : "", removable: !x.system,
+      iconUrl: look ? undefined : x.icon, monoUrl: look ? undefined : x.mono, bg: look ? look.bg : "#fff", glyph: look ? look.glyph : "", removable: !x.system,
       keywords: "android " + x.pkg, launch: () => launch(x.pkg), render() {} });
     if (!known) fresh.push(id);
   });

@@ -278,6 +278,10 @@ public class MainActivity extends Activity {
                         iconCache.put(key, icon);
                     }
                     o.put("icon", icon);
+                    // Android 13+ apps can ship a one-colour version of their icon for themed (tinted) icons
+                    String mono = iconCache.get(key + "#mono");
+                    if (mono == null) { mono = monoDataUrl(ri.loadIcon(pm)); iconCache.put(key + "#mono", mono); }
+                    if (!mono.isEmpty()) o.put("mono", mono);
                     out.put(o);
                 } catch (Exception ignored) { }
             }
@@ -437,6 +441,23 @@ public class MainActivity extends Activity {
         /** Applies an icon pack to every app ("" for the apps' own icons). */
         @JavascriptInterface
         public void setIconPack(String pkg) { Prefs.setIconPack(MainActivity.this, pkg); iconCache.clear(); IconPacks.clear(); }
+    }
+
+    /** The app's monochrome icon layer (Android 13+), drawn white on transparent; "" when the app has none. */
+    private static String monoDataUrl(Drawable d) {
+        if (Build.VERSION.SDK_INT < 33 || !(d instanceof AdaptiveIconDrawable)) return "";
+        Drawable m = ((AdaptiveIconDrawable) d).getMonochrome();
+        if (m == null) return "";
+        int size = 144, pad = size / 6;
+        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
+        m = m.mutate();
+        m.setTint(Color.WHITE);
+        m.setBounds(-pad, -pad, size + pad, size + pad);
+        m.draw(c);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, bytes);
+        return "data:image/png;base64," + Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP);
     }
 
     /** Icon-pack drawables are finished artwork: draw them edge to edge. */

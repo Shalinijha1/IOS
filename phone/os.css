@@ -501,3 +501,16 @@ html.panel, body.panel, body.panel #stage, body.panel #frame, body.panel #screen
 body.panel #wall, body.panel #home, body.panel #windows, body.panel #island, body.panel #homeBarZone, body.panel #status, body.panel #boot, body.panel #dim { display: none !important; }
 body.panel #cover .bg { background: rgba(10,12,18,.55) !important; filter: none !important; }
 body.panel #cc { background: rgba(10,12,18,.45); }
+
+/* Tinted icons, done properly: apps that ship a monochrome icon (Android 13+) show that shape in the tint colour on a dark
+   tinted tile, like a themed iPhone Home Screen; apps without one fall back to the colour filter above. */
+.icon .mono { display: none; }
+.icons-tinted #home .icon.has-mono, .icons-tinted #spotlight .icon.has-mono, .icons-tinted .lib-folder .icon.has-mono {
+  filter: none; background: linear-gradient(hsl(var(--icon-hue) 30% 16%), hsl(var(--icon-hue) 35% 9%)) !important; }
+.icons-tinted .icon.has-mono .mono { display: block; position: absolute; inset: 0; background: hsl(var(--icon-hue) 85% 72%);
+  -webkit-mask-size: cover; mask-size: cover; -webkit-mask-position: center; mask-position: center; }
+.icons-dark .icon.has-mono .mono { display: none; }
+/* Large icons: no names, bigger tiles, like the iOS 18+ "Large" Home Screen option */
+.icons-large #home .page .cell .lbl, .icons-large #dock .cell .lbl { display: none; }
+.icons-large #home .page .cell .icon { width: 74px; height: 74px; border-radius: 17px; }
+.icons-large #home .grid { grid-auto-rows: 92px; align-items: center; }
