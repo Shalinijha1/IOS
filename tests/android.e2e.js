@@ -20,15 +20,48 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "PASS" : "FAIL"}  $
 
 // A pretend phone: 30 apps with generated icons; default dialer, SMS, browser and camera; records every bridge call.
 const BRIDGE = () => {
-  const names = ["Dialer", "Texts", "Web", "Cam", "Gallery", "Bank", "Chat", "Video Player", "Podcasts", "Notes Pro", "Fitness", "Recipes", "Trains", "Weather Now", "News", "Shop", "Banking 2", "Translator", "Scanner", "Radio",
-    "Puzzle", "Racer", "Drawing", "Books", "Ride", "Flights", "Mail Pro", "Calendar+", "Files Go", "Android Settings"];
-  const icon = i => { const c = document.createElement("canvas"); c.width = c.height = 48; const g = c.getContext("2d"); g.fillStyle = `hsl(${i * 37 % 360},70%,50%)`; g.fillRect(0, 0, 48, 48); g.fillStyle = "#fff"; g.font = "bold 26px sans-serif"; g.fillText(String.fromCharCode(65 + i % 26), 14, 33); return c.toDataURL(); };
+  // A realistic phone: the stock system apps (restyled by Glassline) plus fictional third-party apps with designed icons.
+  const SYS = [["com.google.android.dialer", "Phone"], ["com.google.android.apps.messaging", "Messages"], ["com.google.android.GoogleCamera", "Camera"], ["com.google.android.apps.photos", "Photos"],
+    ["com.google.android.deskclock", "Clock"], ["com.google.android.calculator", "Calculator"], ["com.google.android.calendar", "Calendar"], ["com.google.android.contacts", "Contacts"],
+    ["com.android.settings", "Settings"], ["com.google.android.apps.nbu.files", "Files"], ["com.google.android.apps.recorder", "Recorder"]];
+  const THIRD = [["Wave Browser", "#4facfe", "#00c6fb", "globe"], ["Pocket Bank", "#11998e", "#38ef7d", "coin"], ["ChatMate", "#7f5af0", "#2cb67d", "bubble"], ["Trail Run", "#f7971e", "#ffd200", "bolt"],
+    ["Daily News", "#232526", "#414345", "lines"], ["Chess Club", "#3a3a3a", "#000", "king"], ["Podcast Hub", "#8e2de2", "#4a00e0", "mic"], ["Recipe Box", "#ff512f", "#f09819", "bowl"],
+    ["Flight Deck", "#36d1dc", "#5b86e5", "plane"], ["Book Nook", "#c94b4b", "#4b134f", "book"], ["Ride Now", "#000", "#434343", "car"], ["Fit Coach", "#ff416c", "#ff4b2b", "heart"],
+    ["Tune Box", "#fc466b", "#3f5efb", "note"], ["Photo Lab", "#f953c6", "#b91d73", "aperture"], ["Shop Cart", "#f12711", "#f5af19", "bag"], ["Lingo Daily", "#56ab2f", "#a8e063", "speech"],
+    ["Budget Buddy", "#0f2027", "#2c5364", "chart"], ["Video Play", "#e52d27", "#b31217", "play"], ["Sky Weather", "#2980b9", "#6dd5fa", "sun"]];
+  const icon = (a, b, kind) => {
+    const c = document.createElement("canvas"); c.width = c.height = 96; const g = c.getContext("2d");
+    const gr = g.createLinearGradient(0, 0, 96, 96); gr.addColorStop(0, a); gr.addColorStop(1, b); g.fillStyle = gr; g.fillRect(0, 0, 96, 96);
+    g.fillStyle = "#fff"; g.strokeStyle = "#fff"; g.lineWidth = 7; g.lineCap = g.lineJoin = "round";
+    const P = { globe: () => { g.beginPath(); g.arc(48, 48, 26, 0, 7); g.stroke(); g.beginPath(); g.ellipse(48, 48, 11, 26, 0, 0, 7); g.stroke(); g.beginPath(); g.moveTo(22, 48); g.lineTo(74, 48); g.stroke(); },
+      coin: () => { g.beginPath(); g.arc(48, 48, 26, 0, 7); g.fill(); g.fillStyle = a; g.font = "bold 34px sans-serif"; g.textAlign = "center"; g.fillText("$", 48, 60); },
+      bubble: () => { g.beginPath(); g.ellipse(48, 44, 28, 22, 0, 0, 7); g.fill(); g.beginPath(); g.moveTo(30, 58); g.lineTo(24, 74); g.lineTo(42, 63); g.fill(); },
+      bolt: () => { g.beginPath(); g.moveTo(54, 16); g.lineTo(28, 54); g.lineTo(46, 54); g.lineTo(40, 80); g.lineTo(68, 40); g.lineTo(50, 40); g.closePath(); g.fill(); },
+      lines: () => { g.fillRect(22, 24, 52, 10); [44, 56, 68].forEach(y => g.fillRect(22, y, y === 68 ? 34 : 52, 6)); },
+      king: () => { g.fillRect(30, 66, 36, 10); g.beginPath(); g.moveTo(34, 64); g.lineTo(38, 38); g.lineTo(58, 38); g.lineTo(62, 64); g.fill(); g.fillRect(45, 18, 6, 18); g.fillRect(38, 24, 20, 6); },
+      mic: () => { g.beginPath(); g.roundRect(37, 18, 22, 38, 11); g.fill(); g.beginPath(); g.arc(48, 46, 20, 0, Math.PI); g.stroke(); g.fillRect(45, 66, 6, 12); },
+      bowl: () => { g.beginPath(); g.arc(48, 46, 28, 0, Math.PI); g.fill(); g.beginPath(); g.moveTo(36, 36); g.lineTo(44, 18); g.moveTo(52, 36); g.lineTo(60, 18); g.stroke(); },
+      plane: () => { g.save(); g.translate(48, 48); g.rotate(-0.6); g.beginPath(); g.ellipse(0, 0, 30, 6, 0, 0, 7); g.fill(); g.beginPath(); g.moveTo(-4, 0); g.lineTo(-16, -24); g.lineTo(-6, -24); g.lineTo(10, 0); g.lineTo(-6, 24); g.lineTo(-16, 24); g.fill(); g.restore(); },
+      book: () => { g.beginPath(); g.moveTo(48, 28); g.quadraticCurveTo(34, 20, 20, 24); g.lineTo(20, 72); g.quadraticCurveTo(34, 68, 48, 76); g.quadraticCurveTo(62, 68, 76, 72); g.lineTo(76, 24); g.quadraticCurveTo(62, 20, 48, 28); g.fill(); g.strokeStyle = b; g.lineWidth = 3; g.beginPath(); g.moveTo(48, 30); g.lineTo(48, 74); g.stroke(); },
+      car: () => { g.beginPath(); g.roundRect(18, 44, 60, 20, 8); g.fill(); g.beginPath(); g.moveTo(28, 46); g.lineTo(36, 30); g.lineTo(60, 30); g.lineTo(68, 46); g.fill(); g.fillStyle = a; [32, 64].forEach(x => { g.beginPath(); g.arc(x, 66, 8, 0, 7); g.fill(); }); },
+      heart: () => { g.beginPath(); g.moveTo(48, 76); g.bezierCurveTo(10, 50, 22, 18, 48, 34); g.bezierCurveTo(74, 18, 86, 50, 48, 76); g.fill(); },
+      note: () => { g.fillRect(38, 22, 6, 40); g.fillRect(38, 22, 28, 8); g.fillRect(60, 22, 6, 34); g.beginPath(); g.arc(34, 64, 9, 0, 7); g.arc(56, 58, 9, 0, 7); g.fill(); },
+      aperture: () => { g.beginPath(); g.arc(48, 48, 27, 0, 7); g.stroke(); for (let k = 0; k < 6; k++) { const t = k * Math.PI / 3; g.beginPath(); g.moveTo(48 + 10 * Math.cos(t), 48 + 10 * Math.sin(t)); g.lineTo(48 + 27 * Math.cos(t + .9), 48 + 27 * Math.sin(t + .9)); g.stroke(); } },
+      bag: () => { g.beginPath(); g.roundRect(24, 36, 48, 40, 6); g.fill(); g.beginPath(); g.arc(48, 36, 12, Math.PI, 0); g.stroke(); },
+      speech: () => { g.font = "bold 40px sans-serif"; g.textAlign = "center"; g.fillText("Aa", 48, 62); },
+      chart: () => { [[24, 50], [40, 36], [56, 24]].forEach(([x, y]) => g.fillRect(x, y, 12, 72 - y)); },
+      play: () => { g.beginPath(); g.moveTo(38, 26); g.lineTo(70, 48); g.lineTo(38, 70); g.closePath(); g.fill(); },
+      sun: () => { g.beginPath(); g.arc(48, 48, 14, 0, 7); g.fill(); for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; g.beginPath(); g.moveTo(48 + 21 * Math.cos(t), 48 + 21 * Math.sin(t)); g.lineTo(48 + 29 * Math.cos(t), 48 + 29 * Math.sin(t)); g.stroke(); } } };
+    (P[kind] || P.globe)(); return c.toDataURL();
+  };
+  const names = [...SYS.map(x => x[1]), ...THIRD.map(x => x[0])];
   let apps = null;
   const calls = window.__bridgeCalls = [];
   const rec = (n, ...a) => { calls.push([n, ...a]); };
   window.GlasslineAndroid = {
-    listApps() { if (!apps) apps = names.map((n, i) => ({ pkg: "com.example." + n.toLowerCase().replace(/[^a-z0-9]/g, ""), label: n, category: i % 8, system: i === 29, icon: icon(i) })); return JSON.stringify(apps); },
-    defaultApps() { return JSON.stringify({ dialer: "com.example.dialer", sms: "com.example.texts", browser: "com.example.web", camera: "com.example.cam" }); },
+    listApps() { if (!apps) apps = [...SYS.map(([pkg, label]) => ({ pkg, label, category: -1, system: pkg === "com.android.settings", icon: icon("#999", "#666", "globe") })),
+        ...THIRD.map(([label, a, b, kind], i) => ({ pkg: "com.example." + label.toLowerCase().replace(/[^a-z0-9]/g, ""), label, category: i % 8, system: false, icon: icon(a, b, kind) }))]; return JSON.stringify(apps); },
+    defaultApps() { return JSON.stringify({ dialer: "com.google.android.dialer", sms: "com.google.android.apps.messaging", browser: "com.example.wavebrowser", camera: "com.google.android.GoogleCamera" }); },
     launch(p) { rec("launch", p); return true; }, launchFrom(p, x, y, w, h) { rec("launchFrom", p, x, y, w, h); return true; },
     uninstall(p) { rec("uninstall", p); }, appInfo(p) { rec("appInfo", p); }, torch(on) { rec("torch", on); return true; },
     setVolume(v) { rec("setVolume", v); }, setBrightness(v) { rec("setBrightness", v); }, openPanel(n) { rec("openPanel", n); },
@@ -66,14 +99,19 @@ const BRIDGE = () => {
   const L = await page.evaluate(() => GOS.layout());
   const onHome = L.pages.flat().filter(id => id.startsWith("android:"));
   check("every phone app is on the Home Screen", onHome.length + L.dock.filter(id => id.startsWith("android:")).length === 30, `${onHome.length} on pages, dock ${L.dock}`);
-  check("dock holds the default dialer, messages, browser and camera", JSON.stringify(L.dock) === JSON.stringify(["android:com.example.dialer", "android:com.example.texts", "android:com.example.web", "android:com.example.cam"]));
+  check("dock holds the default dialer, messages, browser and camera", JSON.stringify(L.dock) === JSON.stringify(["android:com.google.android.dialer", "android:com.google.android.apps.messaging", "android:com.example.wavebrowser", "android:com.google.android.GoogleCamera"]));
   check("pages hold at most 24 slots", L.pages.every(p => p.reduce((n, it) => n + (it.startsWith("w:") ? 4 : 1), 0) <= 24));
   check("Glassline's duplicate apps stay off the Home Screen", !L.pages.flat().some(id => ["phone", "messages", "camera", "photos"].includes(id)));
+  const sys = await page.evaluate(() => { const a = GOS.apps["android:com.google.android.dialer"], p = GOS.apps["android:com.google.android.apps.photos"]; return { a: a.name, aIcon: !!a.iconUrl, p: p.name, pIcon: !!p.iconUrl, gl: GOS.apps.phone.hidden }; });
+  check("system apps take Glassline's iOS-style icons and names", sys.a === "Phone" && !sys.aIcon && sys.p === "Photos" && !sys.pIcon, JSON.stringify(sys));
+  check("…and replace Glassline's simulated copies, so there's one Phone", sys.gl === true);
+  check("third-party apps keep their own icon", await page.evaluate(() => !!GOS.apps["android:com.example.pocketbank"].iconUrl));
+  check("built-in apps fill the first page, like an iPhone", await page.evaluate(() => GOS.layout().pages[0].slice(2, 6).every(id => GOS.apps[id] && GOS.apps[id].theme)));
   check("Glassline's own Settings is renamed to avoid two “Settings”", await page.evaluate(() => GOS.apps.settings.name === "Home Settings"));
   await page.screenshot({ path: path.join(shots, "android-home.png") });
 
   // tap a real app icon
-  const first = onHome.find(id => !id.endsWith("androidsettings"));   // a system app can't be deleted, so use an ordinary one
+  const first = onHome.find(id => id.startsWith("android:com.example."));   // a system app can't be deleted, so use an ordinary one
   await page.click(`.page .cell[data-item="${first}"] .icon`); await page.waitForTimeout(300);
   const launched = (await calls()).find(c => c[0] === "launchFrom");
   check("tapping an icon launches the real app from the icon's rectangle", launched && launched[1] === first.slice(8) && launched[4] > 0, JSON.stringify(launched));
@@ -84,7 +122,7 @@ const BRIDGE = () => {
   await page.mouse.move(b.x + 30, b.y + 30); await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up(); await page.waitForTimeout(400);
   const menu = await page.$$eval(".ctx button", x => x.map(y => y.textContent));
   check("press and hold shows App Info for a phone app", menu.includes("App Info"), menu.join(", "));
-  const sysMenu = await page.evaluate(() => GOS.apps["android:com.example.androidsettings"].removable);
+  const sysMenu = await page.evaluate(() => GOS.apps["android:com.android.settings"].removable);
   check("a system app offers no Delete", sysMenu === false);
   await page.evaluate(() => [...document.querySelectorAll(".ctx button")].find(b => b.textContent === "Remove App").click()); await page.waitForTimeout(400);
   await page.evaluate(() => [...document.querySelectorAll(".as-group button")].find(b => b.textContent === "Delete App").click()); await page.waitForTimeout(300);
@@ -105,7 +143,7 @@ const BRIDGE = () => {
   check("volume changes the phone's media volume", (await calls()).some(c => c[0] === "setVolume" && Math.abs(c[1] - .3) < 1e-6));
 
   // phone notifications
-  const app2 = onHome.find(id => id !== first && !id.endsWith("androidsettings"));
+  const app2 = onHome.find(id => id !== first && id.startsWith("android:com.example."));
   await page.evaluate(pkg => GOS.androidNotify(JSON.stringify({ key: "k1", pkg, title: "Sam", text: "Lunch at 1pm?", time: Date.now() })), app2.slice(8)); await page.waitForTimeout(500);
   check("a phone notification shows as a banner", await page.$$eval("#banners .ntf", n => n.some(x => /Lunch at 1pm/.test(x.textContent))));
   await page.screenshot({ path: path.join(shots, "android-notification.png") });

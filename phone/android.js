@@ -20,6 +20,31 @@ const CAT = { 0: "Games", 1: "Entertainment", 2: "Entertainment", 3: "Creativity
 const DUPLICATES = ["phone", "messages", "browser", "camera", "photos", "mail", "clock", "calendar", "maps", "calculator", "contacts", "facetime", "music", "weather", "files", "voicememos", "compass", "magnifier", "translate", "health", "wallet", "notes", "reminders", "findmy", "home", "journal", "freeform", "shortcuts", "screentime"];
 const SLOTS = 24;
 
+/* Android's own system apps (from Google, Samsung, Xiaomi, OnePlus and stock Android) take Glassline's iOS-style icon
+   and plain name, so the built-in apps look like one family. Apps from other developers keep their own icon, as they
+   would on an iPhone. Turn off in Home Settings › Restyle System Apps. */
+const SYSTEM = {
+  phone: ["com.google.android.dialer", "com.samsung.android.dialer", "com.android.dialer", "com.oneplus.dialer", "com.android.incallui", "com.miui.dialer"],
+  contacts: ["com.google.android.contacts", "com.samsung.android.app.contacts", "com.android.contacts", "com.oneplus.contacts"],
+  messages: ["com.google.android.apps.messaging", "com.samsung.android.messaging", "com.android.mms", "com.android.messaging", "com.oneplus.mms"],
+  camera: ["com.android.camera", "com.android.camera2", "com.google.android.GoogleCamera", "com.sec.android.app.camera", "com.oneplus.camera", "com.oplus.camera"],
+  photos: ["com.google.android.apps.photos", "com.sec.android.gallery3d", "com.miui.gallery", "com.android.gallery3d", "com.oneplus.gallery", "com.coloros.gallery3d"],
+  clock: ["com.google.android.deskclock", "com.sec.android.app.clockpackage", "com.android.deskclock", "com.oneplus.deskclock"],
+  calculator: ["com.google.android.calculator", "com.sec.android.app.popupcalculator", "com.android.calculator2", "com.miui.calculator", "com.oneplus.calculator"],
+  calendar: ["com.google.android.calendar", "com.samsung.android.calendar", "com.android.calendar"],
+  settings: ["com.android.settings"],
+  files: ["com.google.android.apps.nbu.files", "com.sec.android.app.myfiles", "com.android.documentsui", "com.mi.android.globalFileexplorer"],
+  voicememos: ["com.sec.android.app.voicenote", "com.google.android.apps.recorder", "com.android.soundrecorder"],
+  weather: ["com.sec.android.daemonapp", "com.miui.weather2"],
+  notes: ["com.samsung.android.app.notes", "com.miui.notes"],
+  reminders: ["com.samsung.android.app.reminder"],
+  health: ["com.sec.android.app.shealth"],
+};
+const SYSTEM_NAME = { phone: "Phone", contacts: "Contacts", messages: "Messages", camera: "Camera", photos: "Photos", clock: "Clock", calculator: "Calculator", calendar: "Calendar",
+  settings: "Settings", files: "Files", voicememos: "Voice Memos", weather: "Weather", notes: "Notes", reminders: "Reminders", health: "Health" };
+const IOS_ORDER = ["calendar", "photos", "camera", "clock", "weather", "notes", "reminders", "calculator", "files", "contacts", "voicememos", "health", "settings"];
+const themeFor = pkg => O.settings.restyleSystem === false ? null : Object.keys(SYSTEM).find(k => SYSTEM[k].includes(pkg)) || null;
+
 function launch(pkg) {
   // open the real app from its icon's position so Android can animate out of it
   const el = [...document.querySelectorAll(`.icon[data-app="${aid(pkg)}"]`)].find(e => e.getBoundingClientRect().width > 0);
@@ -43,10 +68,15 @@ function sync() {
   const fresh = [];
   list.forEach(x => {
     const id = aid(x.pkg), known = O.apps[id];
-    O.registerApp({ id, name: x.label, native: x.pkg, category: CAT[x.category] || "Utilities", iconUrl: x.icon, bg: "#fff", glyph: "", removable: !x.system,
+    const t = themeFor(x.pkg), look = t && O.apps[t];
+    O.registerApp({ id, name: look ? SYSTEM_NAME[t] : x.label, native: x.pkg, theme: t || undefined, category: look ? look.category : CAT[x.category] || "Utilities",
+      iconUrl: look ? undefined : x.icon, bg: look ? look.bg : "#fff", glyph: look ? look.glyph : "", removable: !x.system,
       keywords: "android " + x.pkg, launch: () => launch(x.pkg), render() {} });
     if (!known) fresh.push(id);
   });
+  // a restyled system app replaces Glassline's simulated app of the same kind, so there aren't two of each
+  const themed = new Set(list.map(x => themeFor(x.pkg)).filter(Boolean));
+  Object.keys(SYSTEM).forEach(t => { if (O.apps[t] && t !== "settings") O.apps[t].hidden = themed.has(t); });
   if (!O.saved.androidLayout) firstLayout(list);
   else fresh.forEach(id => O.placeApp(id));           // installed while Glassline was in the background
   O.persist(); O.index.dirty = true;
@@ -57,7 +87,9 @@ function firstLayout(list) {
   let defs = {}; try { defs = JSON.parse(call("defaultApps") || "{}"); } catch {}
   const ids = list.slice().sort((a, b) => a.label.localeCompare(b.label)).map(x => aid(x.pkg));
   const dock = ["dialer", "sms", "browser", "camera"].map(k => defs[k] && aid(defs[k])).filter(id => id && ids.includes(id));
-  const rest = ids.filter(id => !dock.includes(id));
+  // like an iPhone: the built-in apps fill the first page in a familiar order, everything else follows A to Z
+  const rank = id => { const t = themeFor(id.slice(8)); const i = IOS_ORDER.indexOf(t); return t ? (i < 0 ? 50 : i) : 100; };
+  const rest = ids.filter(id => !dock.includes(id)).sort((a, b) => rank(a) - rank(b));
   const pages = [["w:weather", "w:calendar"]];
   rest.forEach(id => { let p = pages[pages.length - 1]; const used = p.reduce((n, it) => n + (it.startsWith("w:") ? 4 : 1), 0); if (used >= SLOTS) { p = []; pages.push(p); } p.push(id); });
   const own = ["settings", "store", "tips"].filter(id => O.apps[id]);
@@ -109,6 +141,8 @@ O.androidHome = {
   systemSettings: () => call("openSystemSettings"),
   hasNotificationAccess: () => !!call("hasNotificationAccess"),
   requestNotificationAccess: () => call("requestNotificationAccess"),
+  restyleOn: () => O.settings.restyleSystem !== false,
+  setRestyle: on => { O.set("restyleSystem", !!on); sync(); },
   edgeOn: () => !!call("edgeSwipesOn"),
   setEdge: on => !!call("setEdgeSwipes", !!on),
   iconPacks: () => { try { return JSON.parse(call("listIconPacks") || "[]"); } catch { return []; } },
