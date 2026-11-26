@@ -90,7 +90,7 @@ function firstLayout(list) {
   // like an iPhone: the built-in apps fill the first page in a familiar order, everything else follows A to Z
   const rank = id => { const t = themeFor(id.slice(8)); const i = IOS_ORDER.indexOf(t); return t ? (i < 0 ? 50 : i) : 100; };
   const rest = ids.filter(id => !dock.includes(id)).sort((a, b) => rank(a) - rank(b));
-  const pages = [["w:weather", "w:calendar"]];
+  const pages = [["w:stack", "w:calendar"]];   // like an iPhone: a Smart Stack and the calendar on page one
   rest.forEach(id => { let p = pages[pages.length - 1]; const used = p.reduce((n, it) => n + (it.startsWith("w:") ? 4 : 1), 0); if (used >= SLOTS) { p = []; pages.push(p); } p.push(id); });
   const own = ["settings", "store", "tips"].filter(id => O.apps[id]);
   const last = pages[pages.length - 1]; if (last.length + own.length <= SLOTS) last.push(...own); else pages.push(own);

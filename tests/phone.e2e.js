@@ -218,6 +218,46 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "PASS" : "FAIL"}  $
   await shot("screentime");
   await page.evaluate(() => GOS.goHome()); await page.waitForTimeout(500);
 
+  // 17b. Smart Stack, hidden and locked apps, animated weather
+  await page.evaluate(() => { const L = GOS.layout(); if (!L.pages[0].includes("w:stack")) { L.pages[0].unshift("w:stack"); GOS.persist(); } GOS.renderHome(); }); await page.waitForTimeout(300);
+  const stackBox = await (await page.$('.page .w-stack')).boundingBox();
+  const dotAt = () => page.evaluate(() => [...document.querySelectorAll('.page .w-stack .st-dots i')].findIndex(d => d.classList.contains("on")));
+  const stackBefore = await dotAt();
+  const dir = stackBefore === 0 ? -1 : 1;  // swipe towards a card that exists
+  await page.mouse.move(stackBox.x + stackBox.width / 2, stackBox.y + stackBox.height / 2); await page.mouse.down();
+  for (let i = 1; i <= 6; i++) { await page.mouse.move(stackBox.x + stackBox.width / 2, stackBox.y + stackBox.height / 2 + dir * i * 12); await page.waitForTimeout(12); }
+  await page.mouse.up(); await page.waitForTimeout(500);
+  check("swiping the Smart Stack moves to the next widget", (await dotAt()) === stackBefore - dir, `${stackBefore} -> ${await dotAt()}`);
+  await shot("smart-stack");
+
+  await page.evaluate(() => GOS.hideApp("maps")); await page.waitForTimeout(400);
+  await page.evaluate(() => [...document.querySelectorAll(".as-group button")].find(b => /Hide and Require/.test(b.textContent)).click());
+  await page.waitForTimeout(1600);
+  check("hiding an app takes it off the Home Screen", await page.evaluate(() => GOS.isHidden("maps") && !GOS.layout().pages.flat().includes("maps")));
+  await page.evaluate(() => GOS.openSpotlight("maps")); await page.waitForTimeout(300);
+  check("a hidden app doesn't appear in search", !(await page.$$eval("#spBody .sp-row .t", r => r.some(x => x.textContent === "Maps"))));
+  await page.click("#spCancel");
+  await page.evaluate(() => GOS.notify({ app: "maps", title: "Route", body: "Turn left in 200 m" })); await page.waitForTimeout(200);
+  check("a hidden app's notification has no preview", await page.evaluate(() => { const n = GOS.saved.notifications[0]; return n.title === "Hidden App" && !/Turn left/.test(n.body); }));
+  check("the App Library shows a Hidden folder", await page.evaluate(() => { GOS.renderHome(); return [...document.querySelectorAll(".lib-name")].some(x => x.textContent === "Hidden"); }));
+  await page.evaluate(() => GOS.openHiddenFolder()); await page.waitForTimeout(1700);
+  check("the Hidden folder opens after Face Unlock and lists the app", await page.evaluate(() => [...document.querySelectorAll("#sheetLayer .cell .lbl")].some(x => x.textContent === "Maps")));
+  await shot("hidden-folder");
+  await page.evaluate(() => [...document.querySelectorAll("#sheetLayer .unhide")][0].click()); await page.waitForTimeout(500);
+  check("Unhide puts the app back on the Home Screen", await page.evaluate(() => !GOS.isHidden("maps") && GOS.layout().pages.flat().includes("maps")));
+
+  await page.evaluate(() => { GOS.saved.lockedApps = ["notes"]; GOS.open("notes"); }); await page.waitForTimeout(300);
+  check("a locked app asks for Face Unlock before opening", await page.evaluate(() => !!document.querySelector(".face-auth")));
+  await page.waitForFunction(() => GOS.state.front === "notes", null, { timeout: 5000 }).catch(() => {});
+  check("…then opens", await page.evaluate(() => GOS.state.front === "notes"));
+  await page.evaluate(() => { GOS.saved.lockedApps = []; GOS.goHome(); }); await page.waitForTimeout(600);
+
+  await page.evaluate(() => GOS.setWeather({ ...GOS.weatherNow(), code: 63, cond: "Rain", fetched: Date.now() }));
+  await page.evaluate(() => GOS.open("weather", null, { instant: true })); await page.waitForTimeout(900);
+  check("Weather animates the current condition (rain)", await page.evaluate(() => document.querySelector(".wx-fx").dataset.kind === "rain"));
+  await shot("weather-rain");
+  await page.evaluate(() => GOS.goHome()); await page.waitForTimeout(500);
+
   // 18. Android app: with the native bridge present, installed Android apps appear, launch natively, and Back works
   const ap = await browser.newPage({ viewport: { width: 393, height: 852 } });
   ap.on("pageerror", e => errors.push("android: " + e.message));

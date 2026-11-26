@@ -258,10 +258,54 @@ function iconEl(app, opts = {}) {
 }
 const isInstalled = id => apps[id] && (apps[id].builtin ? !(saved.removed || []).includes(id) : (saved.installed || []).includes(id));
 
+/* ---------- hidden and locked apps (privacy) ----------
+   Hidden: off the Home Screen, out of search, notifications without previews, kept in a Hidden folder at the bottom
+   of the App Library that opens only after Face Unlock or the passcode. Locked: stays visible but asks first. */
+const isHidden = id => (saved.hiddenApps || []).includes(id);
+const isLocked = id => (saved.lockedApps || []).includes(id) || isHidden(id);
+function authenticate(reason = "Unlock") {
+  return new Promise(res => {
+    if (S.passcode) {
+      alertBox({ title: reason, message: "Enter your passcode", input: { type: "password", placeholder: "Passcode" }, buttons: [{ label: "Cancel", cancel: true }, { label: "OK" }] })
+        .then(v => { const ok = v != null && v === S.passcode; if (!ok && v != null) { toast("Wrong passcode"); haptic(60); } res(ok); });
+      return;
+    }
+    // simulated Face Unlock: the same face-scan glyph the lock screen uses, then a tick
+    const box = h("div.face-auth.glass", h("div.fa-ring", { html: '<svg viewBox="0 0 48 48"><path d="M6 16V9a3 3 0 0 1 3-3h7M32 6h7a3 3 0 0 1 3 3v7M42 32v7a3 3 0 0 1-3 3h-7M16 42H9a3 3 0 0 1-3-3v-7" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/><path class="fa-face" d="M17 18v3M31 18v3M24 18v8h-2M18 31c3.5 3 8.5 3 12 0" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' }), h("div.fa-label", "Face Unlock"));
+    screen.append(box); requestAnimationFrame(() => box.classList.add("in"));
+    setTimeout(() => { box.classList.add("ok"); box.querySelector(".fa-label").textContent = "Unlocked"; haptic(15); }, 750);
+    setTimeout(() => { box.classList.remove("in"); setTimeout(() => box.remove(), 250); res(true); }, 1150);
+  });
+}
+function hideApp(id) {
+  const a = apps[id]; if (!a) return;
+  sheet({ title: `Hide “${a.name}”?`, message: "Hidden apps leave the Home Screen and search, and their notifications show no preview. Find them in the Hidden folder at the bottom of the App Library, behind Face Unlock or your passcode.",
+    actions: [{ label: "Hide and Require Face Unlock", run: () => authenticate(`Hide “${a.name}”`).then(ok => { if (!ok) return;
+      saved.hiddenApps = [...new Set([...(saved.hiddenApps || []), id])]; unplace(id); persist(); index.dirty = true; renderHome(); toast(`${a.name} hidden`); }) },
+      { label: isLocked(id) ? "Don't Require Face Unlock" : "Require Face Unlock", run: () => toggleLock(id) }] });
+}
+function toggleLock(id) {
+  const a = apps[id], on = !(saved.lockedApps || []).includes(id);
+  authenticate(on ? `Lock “${a.name}”` : `Unlock “${a.name}”`).then(ok => { if (!ok) return;
+    saved.lockedApps = on ? [...new Set([...(saved.lockedApps || []), id])] : (saved.lockedApps || []).filter(x => x !== id); persist();
+    toast(on ? `${a.name} now asks for Face Unlock` : `${a.name} opens without asking`); });
+}
+function unhideApp(id) { saved.hiddenApps = (saved.hiddenApps || []).filter(x => x !== id); persist(); placeApp(id); index.dirty = true; renderHome(); }
+function openHiddenFolder() {
+  authenticate("Hidden Apps").then(ok => { if (!ok) return;
+    const ids = (saved.hiddenApps || []).filter(id => apps[id]);
+    const box = h("div.glass", { style: { position: "absolute", left: "30px", right: "30px", top: "160px", borderRadius: "36px", padding: "20px", display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "18px", maxHeight: "520px", overflowY: "auto" } },
+      ids.length ? ids.map(id => h("div.cell", iconEl(apps[id]), h("div.lbl", { style: { color: "var(--tint-ink)", textShadow: "none" } }, apps[id].name),
+        h("button.unhide", { onclick: e => { e.stopPropagation(); close(); unhideApp(id); toast(`${apps[id].name} is back on the Home Screen`); } }, "Unhide"))) : h("div", { style: { gridColumn: "span 3", textAlign: "center", color: "var(--tint-ink)" } }, "No hidden apps"));
+    $$(".cell .icon", box).forEach((ic, i) => ic.onclick = () => { close(); open(ids[i], null, { authed: true }); });
+    const { close } = overlay(box, { title: "Hidden" });
+  });
+}
+
 /* ---------- home layout ---------- */
 const DEFAULT_LAYOUT = {
   pages: [
-    ["w:weather", "w:calendar", "calendar", "photos", "camera", "mail", "clock", "maps", "weather", "reminders", "notes", "store", "calculator", "wallet", "settings", "health"],
+    ["w:stack", "w:calendar", "calendar", "photos", "camera", "mail", "clock", "maps", "weather", "reminders", "notes", "store", "calculator", "wallet", "settings", "health"],
     ["w:batteries", "shortcuts", "screentime", "journal", "freeform", "findmy", "home", "files", "voicememos", "contacts", "compass", "magnifier", "translate", "tips", "facetime", "w:music"],
   ],
   dock: ["phone", "browser", "messages", "music"],
@@ -275,6 +319,7 @@ const weight = it => it.startsWith("w:") ? (WIDGETS[it.slice(2)]?.size === "wide
 const folders = () => (saved.folders = saved.folders || {});
 const inFolder = id => Object.keys(folders()).find(f => folders()[f].apps.includes(id));
 function placeApp(id) {
+  if (isHidden(id)) return;               // hidden apps only live in the App Library's Hidden folder
   const L = layout();
   if (L.pages.flat().includes(id) || L.dock.includes(id) || inFolder(id)) return;
   let pg = L.pages.find(p => p.reduce((a, it) => a + weight(it), 0) < SLOTS);
@@ -348,10 +393,53 @@ const WIDGETS = {
       ...items.map(i => h("div.sm", { style: { color: "#333", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, "○ " + i.text))); } },
   photo: { name: "Photos", size: "small", render: () => { const ph = (appStore("photos").get("items", []) || [])[0];
     return h("div.widget.w-photo", { onclick: () => open("photos"), style: { backgroundImage: ph ? `url(${ph.src})` : WALLPAPERS[3].css } }, h("div.sm", "Featured Photo")); } },
+  stack: { name: "Smart Stack", size: "small", render: () => stackWidget() },
   weatherWide: { name: "Weather (wide)", size: "wide", render: () => { const w = weatherNow();
     return h("div.widget.w-weather.w4", { onclick: () => open("weather") }, h("div", { style: { display: "flex", justifyContent: "space-between" } }, h("div", h("h4", w.city), h("div.big", w.temp + "°")), h("div.sm", { style: { textAlign: "right" } }, w.cond, h("br"), `H:${w.hi}° L:${w.lo}°`)),
       h("div", { style: { display: "flex", justifyContent: "space-between", marginTop: "14px" } }, ...w.hours.slice(0, 6).map(x => h("div.sm", { style: { textAlign: "center" } }, x.h, h("div", { style: { margin: "4px 0" }, html: wxIcon(x.i, 20) }), x.t + "°")))); } },
 };
+/* ---------- Smart Stack: several widgets in one tile; swipe up and down, opens on what suits the moment ---------- */
+const STACK_CARDS = { weather: "weather", calendar: "calendar", reminders: "reminders", batteries: null, music: "music" };
+function stackPick(cards) {
+  const hr = new Date().getHours(), ev = nextEvent(), m = media.state();
+  const want = m.playing ? "music" : (battery.charging || battery.level < .3) ? "batteries"
+    : ev && ev.time && (parseInt(ev.time) - hr) <= 2 ? "calendar" : hr >= 6 && hr < 11 ? "weather" : hr >= 18 && hr < 23 ? "reminders" : "weather";
+  return Math.max(0, cards.indexOf(want));
+}
+function stackWidget() {
+  const cards = (saved.stackCards || Object.keys(STACK_CARDS)).filter(k => WIDGETS[k]);
+  let i = stackPick(cards);
+  const track_ = h("div.st-track", cards.map(k => { const el = WIDGETS[k].render(); el.onclick = null; el.classList.add("st-card-w"); return el; }));
+  const dots = h("div.st-dots", cards.map((_, k) => h("i", { class: k === i ? "on" : "" })));
+  const root = h("div.widget.w-stack", { dataset: { entity: "widget", title: "Smart Stack" } }, track_, dots);
+  const show = (k, animate = true) => {
+    i = clamp(k, 0, cards.length - 1);
+    track_.style.transition = animate ? "transform .45s cubic-bezier(.3,1.2,.5,1)" : "none";
+    track_.style.transform = `translateY(${-i * 100}%)`;
+    [...dots.children].forEach((d, n) => d.classList.toggle("on", n === i));
+  };
+  show(i, false);
+  root.addEventListener("pointerdown", e => {
+    if (state.jiggle || e.button > 0) return;          // edit mode: let the Home Screen move it
+    e.stopImmediatePropagation();
+    const hold = setTimeout(() => { held = true; haptic(12); ctxMenu(root, [{ label: "Edit Stack", run: editStack }, { label: "Edit Home Screen", run: enterJiggle }, { label: "Remove Widget", red: true, run: () => { unplace("w:stack"); renderHome(); } }]); }, 480);
+    let held = false;
+    track(e, { axis: true,
+      move(dx, dy, p, dir) { clearTimeout(hold); if (dir !== "y") return; track_.style.transition = "none"; const edge = (i === 0 && dy > 0) || (i === cards.length - 1 && dy < 0); track_.style.transform = `translateY(calc(${-i * 100}% + ${edge ? dy * .3 : dy}px))`; },
+      end(dx, dy, vx, vy, info) {
+        clearTimeout(hold); if (held) return;
+        if (!info.moved) { const k = cards[i], app = STACK_CARDS[k]; if (app) open(app, root); else toast("Batteries"); return; }
+        if (info.dir === "y") { const pr = dy + project(vy, .99); show(pr < -40 ? i + 1 : pr > 40 ? i - 1 : i); haptic(6); }
+        else show(i);
+      } });
+  });
+  return root;
+}
+function editStack() {
+  const all = Object.keys(STACK_CARDS), cur = new Set(saved.stackCards || all);
+  sheet({ title: "Edit Stack", message: "Tap to add or remove a widget from the stack.", actions: all.map(k => ({ label: `${cur.has(k) ? "✓ " : ""}${WIDGETS[k].name}`, run: () => {
+    cur.has(k) ? cur.delete(k) : cur.add(k); if (!cur.size) cur.add("weather"); saved.stackCards = all.filter(x => cur.has(x)); persist(); renderHome(); setTimeout(editStack, 350); } })) });
+}
 function analogClock(size) {
   const d = new Date(), hA = (d.getHours() % 12 + d.getMinutes() / 60) * 30, mA = d.getMinutes() * 6, sA = d.getSeconds() * 6;
   const ticks = Array.from({ length: 12 }, (_, i) => `<text x="${50 + 38 * Math.sin(i * Math.PI / 6)}" y="${54 + -38 * Math.cos(i * Math.PI / 6)}" font-size="10" text-anchor="middle" fill="#111" font-family="system-ui">${i || 12}</text>`).join("");
@@ -560,7 +648,7 @@ function todayPage() {
 }
 const LIB_CATS = [["Suggestions", null], ["Recently Added", null], ["Android Apps", "Android"], ["Social", "Social"], ["Utilities", "Utilities"], ["Productivity & Finance", "Productivity"], ["Creativity", "Creativity"], ["Entertainment", "Entertainment"], ["Information & Reading", "Information"], ["Health & Fitness", "Health"], ["Games", "Games"]];
 function libraryPage() {
-  const all = Object.values(apps).filter(a => isInstalled(a.id) && !a.hidden);
+  const all = Object.values(apps).filter(a => isInstalled(a.id) && !a.hidden && !isHidden(a.id));
   const folders = LIB_CATS.map(([name, cat]) => {
     let list = cat ? all.filter(a => a.category === cat) : name === "Suggestions" ? state.recents.map(id => apps[id]).filter(Boolean) : (saved.installed || []).slice().reverse().map(id => apps[id]).filter(Boolean);
     if (name === "Suggestions" && list.length < 4) list = list.concat(all.filter(a => !list.includes(a))).slice(0, 4);
@@ -577,6 +665,7 @@ function libraryPage() {
       rest.length ? (rest.length === 1 ? (() => { const ic = iconEl(rest[0]); ic.onclick = () => open(rest[0].id, ic); return ic; })() : h("div.mini", { onclick: () => folderOpen(f) }, rest.slice(0, 4).map(a => iconEl(a)))) : null);
     return h("div", fold, h("div.lib-name", f.name));
   }));
+  if ((saved.hiddenApps || []).some(id => apps[id])) grid.append(h("div", h("div.lib-folder.lib-hidden", { onclick: openHiddenFolder, html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>' }), h("div.lib-name", "Hidden")));
   return h("div.page.library", { dataset: { page: "lib" } }, h("div.lib-search.glass", h("span", { html: sys("search"), style: { width: "18px" } }), search), grid, listView);
 }
 function folderOpen(f) {
@@ -762,6 +851,7 @@ function iconMenu(cell, id) {
     acts.push({ label: "Remove Folder", red: true, run: () => { const ids = folders()[fid].apps.slice(); folders()[fid].apps = []; collapseFolder(fid); ids.forEach(placeApp); renderHome(); toast("Apps moved to the Home Screen"); } }); }
   if (id.startsWith("w:")) acts.push({ label: "Remove Widget", red: true, run: () => { unplace(id); renderHome(); } });
   else if (a && a.removable) acts.push({ label: "Remove App", red: true, run: () => askRemove(id) });
+  if (a && !id.startsWith("w:") && !id.startsWith("f:")) acts.splice(acts.length - (a.removable ? 1 : 0), 0, { label: isLocked(id) ? "Hide or Unlock App" : "Hide or Lock App", run: () => hideApp(id) });
   ctxMenu(cell, acts);
 }
 function askRemove(id) {
@@ -849,6 +939,7 @@ function makeCtx(a, appEl, win) {
 }
 async function open(id, fromEl, opts = {}) {
   const a = apps[id]; if (!a) return toast("App not found");
+  if (isLocked(id) && !opts.authed && !state.locked) { const ok = await authenticate(`Open “${a.name}”`); if (!ok) return; opts = { ...opts, authed: true }; }
   if (a.launch) { closeOverlays(); a.launch(); return; }
   if (!isInstalled(id)) { open("store"); setTimeout(() => emit("store-show", id), 500); return; }
   if (state.locked) { pendingOpen = id; return unlockFlow(); }
@@ -1207,8 +1298,9 @@ function openNC() { if (state.locked) return; coverShow("nc"); state.ncOpen = tr
 saved.notifications = saved.notifications || [];
 function notify(n) {
   n = Object.assign({ id: Math.random().toString(36).slice(2), time: Date.now(), app: "settings", title: "", body: "" }, n);
+  if (isHidden(n.app)) { n.hiddenFrom = n.app; n.app = "__hidden"; n.title = "Hidden App"; n.body = "Notification"; n.open = false; n.quiet = true; }
   const a = apps[n.app];
-  const quiet = S.focus && !(n.breakthrough);
+  const quiet = (S.focus && !(n.breakthrough)) || n.quiet;
   saved.notifications.unshift(n); saved.notifications = saved.notifications.slice(0, 60); persist();
   badges[n.app] = (badges[n.app] || 0) + 1; if (state.mode === "home") renderHome();
   if (state.locked) { renderNC(); if (!quiet) { wakeBrief(); SOUND.notify(); haptic(30); } return n; }
@@ -1505,7 +1597,7 @@ const SETTINGS_PAGES = [
 function buildIndex() {
   const GS = window.GlasslineSearch; if (!GS) return null;
   const idx = GS.createIndex(); const list = [];
-  Object.values(apps).filter(a => !a.hidden).forEach(a => list.push({ id: "app:" + a.id, type: isInstalled(a.id) ? "app" : "store", title: a.name, subtitle: isInstalled(a.id) ? a.category : "Store · Get", keys: [a.category, a.keywords || "", a.desc || ""], run: () => open(a.id) }));
+  Object.values(apps).filter(a => !a.hidden && !isHidden(a.id)).forEach(a => list.push({ id: "app:" + a.id, type: isInstalled(a.id) ? "app" : "store", title: a.name, subtitle: isInstalled(a.id) ? a.category : "Store · Get", keys: [a.category, a.keywords || "", a.desc || ""], run: () => open(a.id) }));
   SETTINGS_PAGES.forEach(([t, k]) => list.push({ id: "set:" + t, type: "setting", title: t, subtitle: "Settings", keys: [k], run: () => open("settings", null, { intent: { page: t } }) }));
   ["Mia Chen", "Leo Park", "Ava Rossi", "Noah Smith", "Sam Patel", "Grandma"].forEach(n => list.push({ id: "c:" + n, type: "contact", title: n, subtitle: "Contact", keys: ["person phone call message"], run: () => open("phone", null, { intent: { contact: n } }) }));
   (appStore("notes").get("notes", []) || []).forEach(n => list.push({ id: "n:" + n.id, type: "note", title: n.text.split("\n")[0].slice(0, 60) || "New Note", subtitle: "Notes", body: n.text, run: () => open("notes", null, { intent: { note: n.id } }) }));
@@ -1912,7 +2004,7 @@ window.GOS = {
   notify, toast, sheet, alert: alertBox, prompt: prompt_, share, ctxMenu, overlay, hud, torch: v => torch(v), get torchOn() { return torchOn; },
   settings: S, set, on, emit, appStore, media, battery, live, startTimer, stopTimer, timerState, recState, callState, fmtDur,
   weatherNow, setWeather, WALLPAPERS, wallpaperCSS, WIDGETS, summarize, matchIntent, runIntent, handleAsk, openAssistant, openSpotlight, openCC, openNC, showSwitcher,
-  screenEntities, setBadge, standby, folders, openFolder, mergeIntoFolder, badges, state, saved, persist, layout, renderHome, index, calcAnswer, start, boot, makeStack, asChip, findApp,
+  screenEntities, isHidden, isLocked, hideApp, unhideApp, authenticate, openHiddenFolder, setBadge, standby, folders, openFolder, mergeIntoFolder, badges, state, saved, persist, layout, renderHome, index, calcAnswer, start, boot, makeStack, asChip, findApp,
   reset() { localStorage.removeItem(KEY); location.reload(); },
   androidBack() {
     if (PANEL) { closeOverlays(); panelDone(); return true; }

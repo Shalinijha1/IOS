@@ -557,14 +557,61 @@ async function fetchWeather(name) {
     hours: w.hourly.time.slice(Math.max(0, nowI), Math.max(0, nowI) + 24).map((t, i) => ({ h: i ? t.slice(11, 13) + "h" : "Now", t: Math.round(w.hourly.temperature_2m[nowI + i]), i: WMO(w.hourly.weather_code[nowI + i])[1] })),
     days: w.daily.time.map((t, i) => ({ d: i ? new Date(t + "T12:00").toLocaleDateString(undefined, { weekday: "short" }) : "Today", i: WMO(w.daily.weather_code[i])[1], lo: Math.round(w.daily.temperature_2m_min[i]), hi: Math.round(w.daily.temperature_2m_max[i]) })) };
 }
+/* ---------- animated weather backgrounds: drawn live behind the forecast, matching the current condition ---------- */
+function weatherFx(canvas) {
+  const g = canvas.getContext("2d"); let kind = "clear-day", raf = 0, t0 = performance.now(), parts = [], flash = 0, W = 0, Hh = 0;
+  const cloudSprite = (() => {   // one soft cloud, drawn once and reused at different sizes
+    const c = document.createElement("canvas"); c.width = 360; c.height = 200; const x = c.getContext("2d");
+    [[120, 120, 70], [190, 95, 85], [260, 120, 65], [80, 140, 50], [300, 145, 45], [180, 145, 70]].forEach(([cx, cy, r]) => {
+      const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, "rgba(255,255,255,.95)"); gr.addColorStop(.7, "rgba(255,255,255,.55)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+      x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill(); });
+    return c; })();
+  function size() { const r = canvas.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); W = canvas.width = Math.max(1, r.width * d); Hh = canvas.height = Math.max(1, r.height * d); seed(); }
+  function seed() {
+    const n = { rain: 140, storm: 190, snow: 90, "clear-night": 120, cloudy: 7, partly: 4, fog: 6, "clear-day": 0 }[kind] || 0;
+    parts = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * Hh, z: .4 + Math.random() * .8, p: Math.random() * 6.28 }));
+  }
+  function frame(now) {
+    const t = (now - t0) / 1000; g.clearRect(0, 0, W, Hh);
+    if (kind === "clear-day" || kind === "partly") {   // sun glow with slowly turning rays
+      const cx = W * .78, cy = Hh * .1, r = W * .55 * (1 + .03 * Math.sin(t * .8));
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, "rgba(255,244,200,.55)"); gr.addColorStop(.35, "rgba(255,226,150,.18)"); gr.addColorStop(1, "rgba(255,226,150,0)"); g.fillStyle = gr; g.fillRect(0, 0, W, Hh);
+      g.save(); g.translate(cx, cy); g.rotate(t * .03); g.fillStyle = "rgba(255,250,220,.05)";
+      for (let k = 0; k < 10; k++) { g.rotate(Math.PI / 5); g.beginPath(); g.moveTo(0, 0); g.lineTo(W * 1.2, -W * .05); g.lineTo(W * 1.2, W * .05); g.fill(); }
+      g.restore();
+    }
+    if (kind === "clear-night") parts.forEach(s => { g.fillStyle = `rgba(255,255,255,${.25 + .6 * Math.abs(Math.sin(t * s.z * 1.5 + s.p))})`; g.fillRect(s.x, s.y * .7, 1.6 * s.z, 1.6 * s.z); });
+    if (kind === "cloudy" || kind === "partly" || kind === "rain" || kind === "storm") parts.slice(0, kind === "partly" ? 4 : 7).forEach((c, k) => {
+      const w = W * (.55 + c.z * .5), x = ((c.x + t * 12 * c.z) % (W + w)) - w, y = Hh * (.04 + k * .07);
+      g.globalAlpha = kind === "rain" || kind === "storm" ? .5 : .75; g.drawImage(cloudSprite, x, y, w, w * .55); g.globalAlpha = 1; });
+    if (kind === "rain" || kind === "storm") { g.strokeStyle = "rgba(200,225,255,.55)"; g.lineWidth = 1.4; g.beginPath();
+      parts.forEach(d => { const sp = Hh * (.9 + d.z) * .9; const y = (d.y + t * sp) % Hh, x = d.x - (y / Hh) * 30; g.moveTo(x, y); g.lineTo(x - 3, y + 14 * d.z); }); g.stroke(); }
+    if (kind === "storm") { if (Math.random() < .004) flash = 1; if (flash > 0) { g.fillStyle = `rgba(255,255,255,${flash * .5})`; g.fillRect(0, 0, W, Hh); flash -= .06; } }
+    if (kind === "snow") { g.fillStyle = "rgba(255,255,255,.9)"; parts.forEach(f => { const y = (f.y + t * 40 * f.z) % Hh, x = f.x + Math.sin(t * f.z + f.p) * 18; g.beginPath(); g.arc(x, y, 2.4 * f.z, 0, 7); g.fill(); }); }
+    if (kind === "fog") parts.forEach((b, k) => { const y = Hh * (.2 + k * .13), x = Math.sin(t * .1 * b.z + b.p) * W * .2; const gr = g.createLinearGradient(0, y - 40, 0, y + 40); gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(.5, "rgba(255,255,255,.16)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(x - W * .2, y - 40, W * 1.4, 80); });
+    if (!O.settings.reduceMotion) raf = requestAnimationFrame(frame);
+  }
+  return {
+    set(code, night) { kind = code >= 95 ? "storm" : code >= 71 && code <= 77 ? "snow" : code >= 51 ? "rain" : code >= 45 ? "fog" : code === 3 ? "cloudy" : code >= 1 ? (night ? "clear-night" : "partly") : night ? "clear-night" : "clear-day"; canvas.dataset.kind = kind; if (W) seed(); },
+    start() { cancelAnimationFrame(raf); size(); raf = requestAnimationFrame(frame); },
+    stop() { cancelAnimationFrame(raf); raf = 0; },
+    get kind() { return kind; },
+  };
+}
 O.registerApp({ id: "weather", name: "Weather", bg: "linear-gradient(#4aa3ff,#1e5fd8)", glyph: "weather", category: "Information", status: "light", keywords: "forecast temperature rain",
   render(ctx) {
     const st = ctx.store;
-    const scr = h("div.scroll", { style: { color: "#fff", padding: "70px 18px 120px", textAlign: "center", background: "linear-gradient(#2f6fd6,#5aa0ef)", position: "absolute", inset: 0 } });
-    ctx.el.append(scr);
+    // sky gradient, then the animated layer, then the forecast on top
+    const sky = h("div", { style: { position: "absolute", inset: 0, background: "linear-gradient(#2f6fd6,#5aa0ef)", transition: "background .6s" } });
+    const fxCanvas = h("canvas.wx-fx", { "aria-hidden": "true", style: { position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" } });
+    const fx = weatherFx(fxCanvas);
+    const scr = h("div.scroll", { style: { color: "#fff", padding: "70px 18px 120px", textAlign: "center", background: "transparent", position: "absolute", inset: 0 } });
+    ctx.el.append(sky, fxCanvas, scr);
+    ctx.onHide(() => fx.stop()); ctx.onClose(() => fx.stop());
     const draw = w => {
       const night = new Date().getHours() < 6 || new Date().getHours() > 19;
-      scr.style.background = w.code >= 51 ? "linear-gradient(#45546b,#7d8ba1)" : night ? "linear-gradient(#0d1b3d,#2a3d6b)" : "linear-gradient(#2f6fd6,#5aa0ef)";
+      sky.style.background = w.code >= 95 ? "linear-gradient(#262d3d,#4a5468)" : w.code >= 51 ? "linear-gradient(#45546b,#7d8ba1)" : w.code === 3 || (w.code >= 45 && w.code < 51) ? "linear-gradient(#5f7590,#9fb0c3)" : night ? "linear-gradient(#0d1b3d,#2a3d6b)" : "linear-gradient(#2f6fd6,#5aa0ef)";
+      fx.set(w.code, night); if (O.state.front === "weather" || !fx.kind) fx.start();
       const card = (...k) => h("div", { style: { background: "rgba(255,255,255,.14)", backdropFilter: "blur(20px)", borderRadius: "16px", padding: "12px", textAlign: "left", marginTop: "14px" } }, ...k);
       scr.innerHTML = "";
       scr.append(h("div", { dataset: { entity: "place", title: w.city }, style: { fontSize: "32px" } }, w.city), h("div", { style: { fontSize: "96px", fontWeight: 200, lineHeight: 1 } }, w.temp + "°"), h("div", { style: { fontSize: "20px" } }, w.cond), h("div", { style: { fontSize: "18px" } }, `H:${w.hi}°  L:${w.lo}°`),

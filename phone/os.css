@@ -519,3 +519,22 @@ body.panel #cc { background: rgba(10,12,18,.45); }
 body.android.tablet { background: #000; }
 body.android.tablet #stage::before { content: ""; position: fixed; inset: -40px; background: var(--tablet-wall, #111); background-size: cover; filter: blur(40px) brightness(.6); }
 body.android.tablet #screen { border-radius: 40px; }
+
+/* ---------- Smart Stack ---------- */
+.w-stack { padding: 0 !important; overflow: hidden; position: relative; touch-action: none; }
+.w-stack .st-track { position: absolute; inset: 0; will-change: transform; }
+.w-stack .st-card-w { position: relative; height: 100%; border-radius: 0 !important; box-shadow: none !important; }
+.w-stack .st-dots { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; z-index: 2; }
+.w-stack .st-dots i { width: 4px; height: 4px; border-radius: 2px; background: rgba(142,142,147,.45); transition: height .25s; }   /* grey reads on light and dark cards */
+.w-stack .st-dots i.on { height: 10px; background: rgba(142,142,147,.95); }
+/* ---------- privacy: Face Unlock prompt, Hidden folder ---------- */
+.face-auth { position: absolute; left: 50%; top: 42%; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 34px; z-index: 96; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  color: var(--tint-ink); opacity: 0; transform: scale(.85); transition: opacity .2s, transform .25s cubic-bezier(.3,1.4,.5,1); pointer-events: none; }
+.face-auth.in { opacity: 1; transform: none; }
+.face-auth .fa-ring { width: 64px; height: 64px; animation: fa-scan .9s ease-in-out infinite alternate; }
+.face-auth.ok .fa-ring { color: #30d158; animation: none; }
+.face-auth .fa-label { font-size: 14px; font-weight: 600; }
+@keyframes fa-scan { from { transform: scale(.94); opacity: .7; } to { transform: scale(1.04); opacity: 1; } }
+.lib-hidden { display: grid !important; place-items: center; color: rgba(255,255,255,.85); }
+.lib-hidden svg { width: 46%; height: 46%; }
+.cell .unhide { margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(var(--tint), .7); border-radius: 10px; padding: 3px 9px; }
