@@ -1,0 +1,57 @@
+# Builds the Glassline OS Android app (APK) on every change to the shell or the Android project.
+# Download it from the Actions tab → the run → Artifacts. Pushing a tag like v27.0.1 also attaches it to a GitHub Release.
+# It builds both editions: GlasslineOS-android.apk (standard) and GlasslineOS-android-full.apk (with the notification reader).
+name: Android app
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths: ["phone/**", "android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+          # Save the downloaded build tools on every branch (by default only the main branch saves them),
+          # so later builds reuse them instead of downloading everything from Maven Central again.
+          cache-read-only: false
+      - name: Build APK
+        working-directory: android
+        # Maven Central sometimes answers "429 Too Many Requests" to GitHub's shared machines. Gradle retries each
+        # download with growing pauses, and if the whole build still fails it waits and tries again (three times).
+        run: |
+          for attempt in 1 2 3; do
+            if gradle --no-daemon -Dorg.gradle.internal.repository.max.retries=8 -Dorg.gradle.internal.repository.initial.backoff=2000 assembleRelease; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then echo "::warning::Build attempt $attempt failed; retrying in $((attempt * 90)) seconds"; sleep $((attempt * 90)); fi
+          done
+          exit 1
+      - name: Name the APKs
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/standard/release/app-standard-release.apk dist/GlasslineOS-android.apk
+          cp android/app/build/outputs/apk/full/release/app-full-release.apk dist/GlasslineOS-android-full.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GlasslineOS-android
+          path: dist/*.apk
+          if-no-files-found: error
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
