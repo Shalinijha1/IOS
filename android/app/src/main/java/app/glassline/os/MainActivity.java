@@ -401,6 +401,13 @@ public class MainActivity extends Activity {
             return ri != null && getPackageName().equals(ri.activityInfo.packageName);
         }
 
+        /** False in the standard edition, which leaves out the notification reader. */
+        @JavascriptInterface
+        public boolean notificationsSupported() {
+            try { getPackageManager().getServiceInfo(new ComponentName(MainActivity.this, NotificationService.class), 0); return true; }
+            catch (PackageManager.NameNotFoundException e) { return false; }
+        }
+
         @JavascriptInterface
         public boolean hasNotificationAccess() {
             String flat = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");

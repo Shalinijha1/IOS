@@ -4,12 +4,19 @@ Behavioural reverse engineering of iOS 27 interaction patterns, plus original we
 
 ## Glassline OS for Android: turn your phone's Home Screen into Glassline
 
-`releases/GlasslineOS-android-27.0.0.apk` is an Android Home app (launcher). Once it's your Home app, your phone shows the Glassline interface with **your real Android apps** on its Home Screen.
+The Android app is an Android Home app (launcher). Once it's your Home app, your phone shows the Glassline interface with **your real Android apps** on its Home Screen. `releases/` has it in two editions:
+
+| File | Edition | Installs from a browser |
+|---|---|---|
+| `GlasslineOS-android-27.0.1.apk` | **Standard**: everything except showing your other apps' notifications | Yes |
+| `GlasslineOS-android-27.0.1-full.apk` | **Full**: also shows your apps' notifications in Glassline | Blocked by Play Protect in some countries (see below) |
 
 1. On the Android phone, open this repository on GitHub (sign in if it's private), go to `releases/`, tap the APK and choose **Download**.
 2. Open the downloaded file. Android asks to allow installs from your browser or file manager: allow it once, then tap **Install**. The APK isn't from Google Play, so Play Protect may warn you; it's built from the code in `android/` and `phone/`.
-3. Open **Glassline OS**, swipe up, and tap **Use Glassline as Home Screen**, then pick it as the Home app. Tap **Show my app notifications** to allow notification access.
+3. Open **Glassline OS**, swipe up, and tap **Use Glassline as Home Screen**, then pick it as the Home app. In the full edition, tap **Show my app notifications** to allow notification access.
 4. Press Home: you're in Glassline. To go back to your old launcher, choose it again in Android Settings › Apps › Default apps › Home app, or uninstall Glassline.
+
+**“App blocked to protect your device”**: in India and some other countries, Google Play Protect's enhanced fraud protection blocks apps downloaded from a browser, messaging app or file manager if they can read other apps' notifications or SMS messages, or use Accessibility. The full edition reads notifications, so it's blocked there; the standard edition installs normally. To install the full edition anyway, either install it from a computer with `adb install GlasslineOS-android-27.0.1-full.apk` (with USB debugging on), or turn off Play Protect (Google Play › your profile picture › Play Protect › Settings › Scan apps with Play Protect), install, and turn it back on straight away. Each later full-edition update needs the same. Both editions share the package name and signing key, so either one installs over the other.
 
 What you get: every installed app as an icon that opens the real app, with the dock holding your default phone, messages, browser and camera apps. Apps you install or remove elsewhere appear and disappear automatically, and Delete App and App Info use Android's own screens. It also has the lock screen, Control Centre (real flashlight and volume; Wi-Fi, Bluetooth, mobile data and Airplane Mode open Android's panels), your apps' notifications as banners and in Notification Centre, search across your apps, the assistant, widgets and Glassline's own apps. Android's Back gesture closes whatever is open in Glassline.
 
@@ -17,7 +24,7 @@ What you get: every installed app as an icon that opens the real app, with the d
 
 **Icon packs** (Home Settings › Icon Pack): any installed icon pack in the common ADW/Nova format restyles every app's icon, read from the pack's `appfilter.xml` the way other launchers do.
 
-Limits: Android, not iOS, still runs underneath, so the phone's own settings, the system lock (PIN or fingerprint) and app screens stay Android's. Apps from Apple's App Store can't run on Android; the Store opens Google Play for real apps. Every push rebuilds the APK in GitHub Actions (`.github/workflows/android.yml`). To build it yourself, run `cd android && gradle assembleRelease`, which needs the Android SDK. The APK is signed with the standard debug key, so sign it with your own key before publishing it anywhere.
+Limits: Android, not iOS, still runs underneath, so the phone's own settings, the system lock (PIN or fingerprint) and app screens stay Android's. Apps from Apple's App Store can't run on Android; the Store opens Google Play for real apps. Every push rebuilds the APK in GitHub Actions (`.github/workflows/android.yml`). To build it yourself, run `cd android && gradle assembleRelease`, which needs the Android SDK. The APK is signed with the Android SDK's debug key, so sign it with your own key before publishing it anywhere. Each computer that builds it has its own debug key, and Android only installs an update signed with the same key as the installed app, so stick to one source for updates (or uninstall first).
 
 ## Glassline OS: a phone OS that runs in your browser (`phone/`)
 

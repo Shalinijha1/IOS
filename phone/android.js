@@ -156,6 +156,7 @@ O.androidHome = {
   isDefault: () => !!call("isDefaultHome"),
   choose: () => call("chooseHomeApp"),
   systemSettings: () => call("openSystemSettings"),
+  notificationsSupported: () => call("notificationsSupported") !== false,
   hasNotificationAccess: () => !!call("hasNotificationAccess"),
   requestNotificationAccess: () => call("requestNotificationAccess"),
   isAssistant: () => !!call("isAssistant"),
@@ -177,7 +178,7 @@ O.androidHome = {
 function setupPrompt() {
   const steps = [];
   if (!O.androidHome.isDefault()) steps.push({ label: "Use Glassline as Home Screen", run: () => O.androidHome.choose() });
-  if (!O.androidHome.hasNotificationAccess()) steps.push({ label: "Show my app notifications", run: () => O.androidHome.requestNotificationAccess() });
+  if (O.androidHome.notificationsSupported() && !O.androidHome.hasNotificationAccess()) steps.push({ label: "Show my app notifications", run: () => O.androidHome.requestNotificationAccess() });
   if (window.GlasslineAndroid.isAssistant && !O.androidHome.isAssistant()) steps.push({ label: "Use Glassline as my assistant", run: () => O.androidHome.chooseAssistant() });
   if (!steps.length) return;
   steps.push({ label: "Not Now", run: () => { O.saved.androidSetupSnoozed = Date.now(); O.persist(); } });

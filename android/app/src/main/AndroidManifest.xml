@@ -109,15 +109,6 @@
                 android:value="Keeps the user-enabled edge-swipe strips that open Control Centre and Notification Centre over other apps." />
         </service>
 
-        <!-- Optional: with notification access, the phone's notifications appear in Glassline. -->
-        <service
-            android:name=".NotificationService"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
+        <!-- The notification reader is declared only in the full edition: src/full/AndroidManifest.xml. -->
     </application>
 </manifest>

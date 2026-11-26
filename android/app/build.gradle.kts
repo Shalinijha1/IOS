@@ -10,8 +10,18 @@ android {
         applicationId = "app.glassline.os"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2700
-        versionName = "27.0.0"
+        versionCode = 2701
+        versionName = "27.0.1"
+    }
+
+    // Two editions of the same app (same id and signature, so either replaces the other):
+    // - standard: installs from a browser everywhere, including countries where Google Play Protect's "enhanced fraud
+    //   protection" blocks downloaded apps that can read other apps' notifications (India, Brazil, Thailand and others).
+    // - full: adds the notification reader (src/full/AndroidManifest.xml), for installing from a computer or a store.
+    flavorDimensions += "edition"
+    productFlavors {
+        create("standard") { dimension = "edition" }
+        create("full") { dimension = "edition"; versionNameSuffix = "-full" }
     }
 
     // The web shell in ../../phone is packaged as the app's assets; nothing is copied by hand.

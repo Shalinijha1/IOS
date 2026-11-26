@@ -1,5 +1,6 @@
 # Builds the Glassline OS Android app (APK) on every change to the shell or the Android project.
-# Download it from the Actions tab → the run → Artifacts. Pushing a tag like v27.0.0 also attaches it to a GitHub Release.
+# Download it from the Actions tab → the run → Artifacts. Pushing a tag like v27.0.1 also attaches it to a GitHub Release.
+# It builds both editions: GlasslineOS-android.apk (standard) and GlasslineOS-android-full.apk (with the notification reader).
 name: Android app
 
 on:
@@ -39,13 +40,18 @@ jobs:
             if [ "$attempt" -lt 3 ]; then echo "::warning::Build attempt $attempt failed; retrying in $((attempt * 90)) seconds"; sleep $((attempt * 90)); fi
           done
           exit 1
+      - name: Name the APKs
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/standard/release/app-standard-release.apk dist/GlasslineOS-android.apk
+          cp android/app/build/outputs/apk/full/release/app-full-release.apk dist/GlasslineOS-android-full.apk
       - uses: actions/upload-artifact@v4
         with:
           name: GlasslineOS-android
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: dist/*.apk
           if-no-files-found: error
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/release/app-release.apk
+          files: dist/*.apk

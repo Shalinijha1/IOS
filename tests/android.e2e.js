@@ -78,6 +78,7 @@ const BRIDGE = () => {
     dial(n) { rec("dial", n); return true; }, sms(n, b) { rec("sms", n, b); return true; }, setAlarm(h, m, l) { rec("setAlarm", h, m, l); return true; }, setTimer(sec, l) { rec("setTimer", sec, l); return true; },
     navigate(q) { rec("navigate", q); return true; }, webSearch(q) { rec("webSearch", q); return true; }, openCamera() { rec("openCamera"); return true; },
     isAssistant() { return false; }, chooseAssistant() { rec("chooseAssistant"); },
+    notificationsSupported() { return window.__notifSupported !== false; },
   };
 };
 
@@ -256,6 +257,10 @@ const BRIDGE = () => {
   check("left-edge panel opens Notification Centre", await panel.evaluate(() => document.querySelector("#cover").classList.contains("nc")));
   check("Back inside a panel closes it", await panel.evaluate(() => GOS.androidBack() === true && window.__bridgeCalls.some(c => c[0] === "closePanel")));
   await panel.close();
+
+  // the standard edition can't read notifications, so it doesn't offer to
+  check("the full edition offers notification access", await page.evaluate(() => GOS.androidHome.notificationsSupported() === true));
+  check("the standard edition reports it can't read notifications", await page.evaluate(() => { window.__notifSupported = false; const r = GOS.androidHome.notificationsSupported(); window.__notifSupported = true; return r === false; }));
 
   check("no page errors", errors.length === 0, errors.join(" | "));
   await browser.close(); server.close();
