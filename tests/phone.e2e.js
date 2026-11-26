@@ -256,6 +256,12 @@ const check = (name, ok, info = "") => { console.log(`${ok ? "PASS" : "FAIL"}  $
   await page.evaluate(() => GOS.open("weather", null, { instant: true })); await page.waitForTimeout(900);
   check("Weather animates the current condition (rain)", await page.evaluate(() => document.querySelector(".wx-fx").dataset.kind === "rain"));
   await shot("weather-rain");
+  check("Liquid Glass lensing is on in Chromium", await page.evaluate(() => document.querySelector("#screen").classList.contains("lg-refract") && !!document.getElementById("lg-lens")));
+  await page.evaluate(() => { GOS.goHome(); GOS.set("wallpaper", 12); }); await page.waitForTimeout(700);
+  check("a light wallpaper switches the Home Screen to dark ink", await page.evaluate(() => document.querySelector("#screen").classList.contains("wall-light")));
+  await shot("liquid-glass-light");
+  await page.evaluate(() => GOS.set("wallpaper", 8)); await page.waitForTimeout(700);
+  check("…and a dark one back to light ink", await page.evaluate(() => !document.querySelector("#screen").classList.contains("wall-light")));
   await page.evaluate(() => GOS.goHome()); await page.waitForTimeout(500);
 
   // 18. Android app: with the native bridge present, installed Android apps appear, launch natively, and Back works

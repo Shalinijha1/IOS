@@ -108,7 +108,24 @@ O.platform = {
   openNotification: n => { if (call("openNotification", n.key) === false) launch(n.pkg); },
   cancelNotification: n => call("cancelNotification", n.key),
   playStore: q => call("openPlayStore", q || ""),
+  // assistant actions through the phone's own apps; calls and messages open pre-filled for the person to confirm
+  setTimer: ms => call("setTimer", Math.max(1, Math.round(ms / 1000)), "Timer") === true,
+  setAlarm: time => { const [hh, mm] = String(time).split(":").map(Number); return call("setAlarm", hh || 0, mm || 0, "Alarm") === true; },
+  navigate: q => call("navigate", q) === true,
+  webSearch: q => call("webSearch", q) === true,
+  camera: () => call("openCamera") === true,
+  call: to => { const r = resolveNumber(to); if (!r.number) return r; return call("dial", r.number) === true ? { message: `Calling ${r.name || to}…` } : { message: "I couldn't open your phone app." }; },
+  message: (to, text) => { const r = resolveNumber(to); if (!r.number) return r; return call("sms", r.number, text) === true ? { message: `Here's your message to ${r.name || to}. Tap Send in Messages.` } : { message: "I couldn't open your messages app." }; },
 };
+// a spoken name becomes a number from the phone's contacts; plain numbers are used as they are
+function resolveNumber(to) {
+  const s = String(to || "").trim();
+  if (/^\+?[\d\s().-]{3,}$/.test(s)) return { number: s.replace(/[^\d+]/g, "") };
+  let r = {}; try { r = JSON.parse(call("findContact", s) || "{}"); } catch {}
+  if (r.permission) return { message: "Allow Contacts access so I can find who to reach, and I'll try again.", retry: true };
+  if (r.number) return { number: r.number, name: r.name };
+  return { message: `I couldn't find “${s}” in your contacts.` };
+}
 O.on("settings", k => {
   if (k === "volume") call("setVolume", O.settings.volume);
   if (k === "brightness") call("setBrightness", O.settings.brightness);
@@ -141,6 +158,8 @@ O.androidHome = {
   systemSettings: () => call("openSystemSettings"),
   hasNotificationAccess: () => !!call("hasNotificationAccess"),
   requestNotificationAccess: () => call("requestNotificationAccess"),
+  isAssistant: () => !!call("isAssistant"),
+  chooseAssistant: () => call("chooseAssistant"),
   restyleOn: () => O.settings.restyleSystem !== false,
   setRestyle: on => { O.set("restyleSystem", !!on); sync(); },
   edgeOn: () => !!call("edgeSwipesOn"),
@@ -159,6 +178,7 @@ function setupPrompt() {
   const steps = [];
   if (!O.androidHome.isDefault()) steps.push({ label: "Use Glassline as Home Screen", run: () => O.androidHome.choose() });
   if (!O.androidHome.hasNotificationAccess()) steps.push({ label: "Show my app notifications", run: () => O.androidHome.requestNotificationAccess() });
+  if (window.GlasslineAndroid.isAssistant && !O.androidHome.isAssistant()) steps.push({ label: "Use Glassline as my assistant", run: () => O.androidHome.chooseAssistant() });
   if (!steps.length) return;
   steps.push({ label: "Not Now", run: () => { O.saved.androidSetupSnoozed = Date.now(); O.persist(); } });
   O.sheet({ title: "Set Up Glassline", message: "Make Glassline your Home Screen so the Home gesture brings you here, and allow notification access so your apps' notifications appear on the lock screen and in Notification Centre.", actions: steps });

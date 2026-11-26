@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Voice assistant: set alarms and timers in the Clock app, and find the person to call or message in Contacts
+         (asked for only when someone is named). -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
@@ -27,6 +31,9 @@
         <intent><action android:name="org.adw.launcher.THEMES" /></intent>
         <intent><action android:name="org.adw.ActivityStarter.THEMES" /></intent>
         <intent><action android:name="com.novalauncher.THEME" /></intent>
+        <!-- Android 11+: needed to reach the phone's speech recognizer and text-to-speech engine -->
+        <intent><action android:name="android.speech.RecognitionService" /></intent>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
     </queries>
 
     <application
@@ -62,6 +69,24 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity-alias>
+
+        <!-- The assistant over the current app. Handling ACTION_ASSIST lets Glassline be chosen as the phone's
+             digital assistant (Settings › Apps › Default apps), so holding power or home opens it. -->
+        <activity
+            android:name=".AssistActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Glassline.Panel"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.glassline.os.assist"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|uiMode|density">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <!-- Control Centre / Notification Centre over the current app, opened by an edge swipe. -->
         <activity

@@ -76,6 +76,7 @@ public class MainActivity extends Activity {
     private GeolocationPermissions.Callback pendingGeo;
     private String pendingGeoOrigin;
     private final Map<String, String> iconCache = new HashMap<>();
+    private Assistant assistant;   // voice: created on first use
 
     private final BroadcastReceiver packages = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) { js("window.GOS && GOS.emit('android-packages')"); }
@@ -178,6 +179,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (!isPanel()) try { unregisterReceiver(packages); unregisterReceiver(screen); } catch (IllegalArgumentException ignored) { }
+        if (assistant != null) assistant.destroy();
         if (current == this) current = null;
         super.onDestroy();
     }
@@ -197,8 +199,12 @@ public class MainActivity extends Activity {
         } else if (code == REQ_LOCATION && pendingGeo != null) {
             pendingGeo.invoke(pendingGeoOrigin, ok, false);
             pendingGeo = null;
+        } else if (code == Assistant.REQ_MIC || code == Assistant.REQ_CONTACTS) {
+            assistant().permissionResult(code, ok);
         }
     }
+
+    private Assistant assistant() { if (assistant == null) assistant = new Assistant(this); return assistant; }
 
     /** Full screen: Glassline draws its own status bar and home indicator. Swipe from an edge to show Android's bars. */
     private void hideSystemBars() {
@@ -441,6 +447,21 @@ public class MainActivity extends Activity {
         /** Applies an icon pack to every app ("" for the apps' own icons). */
         @JavascriptInterface
         public void setIconPack(String pkg) { Prefs.setIconPack(MainActivity.this, pkg); iconCache.clear(); IconPacks.clear(); }
+
+        /* ---------- voice assistant: listening, speaking and acting through the phone's own apps ---------- */
+        @JavascriptInterface public void startListening() { assistant().listen(); }
+        @JavascriptInterface public void stopListening() { assistant().stopListening(); }
+        @JavascriptInterface public void speak(String text) { assistant().speak(text); }
+        @JavascriptInterface public String findContact(String name) { return assistant().findContact(name); }
+        @JavascriptInterface public boolean dial(String number) { return assistant().dial(number); }
+        @JavascriptInterface public boolean sms(String number, String body) { return assistant().sms(number, body); }
+        @JavascriptInterface public boolean setAlarm(int hour, int minute, String label) { return assistant().alarm(hour, minute, label); }
+        @JavascriptInterface public boolean setTimer(int seconds, String label) { return assistant().timer(seconds, label); }
+        @JavascriptInterface public boolean navigate(String query) { return assistant().navigate(query); }
+        @JavascriptInterface public boolean webSearch(String query) { return assistant().webSearch(query); }
+        @JavascriptInterface public boolean openCamera() { return assistant().camera(); }
+        @JavascriptInterface public boolean isAssistant() { return assistant().isAssistant(); }
+        @JavascriptInterface public void chooseAssistant() { assistant().chooseAssistant(); }
     }
 
     /** The app's monochrome icon layer (Android 13+), drawn white on transparent; "" when the app has none. */

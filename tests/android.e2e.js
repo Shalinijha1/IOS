@@ -71,6 +71,13 @@ const BRIDGE = () => {
     listIconPacks() { return JSON.stringify([{ pkg: "com.example.roundpack", label: "Round Pack" }]); }, iconPack() { return window.__pack || ""; },
     setIconPack(p) { rec("setIconPack", p); window.__pack = p; apps = null; }, closePanel() { rec("closePanel"); },
     __remove(pkg) { apps = apps.filter(a => a.pkg !== pkg); },
+    // voice: "hearing" whatever the test queued in window.__heard
+    startListening() { rec("startListening"); const said = window.__heard; setTimeout(() => { GOS.androidSpeech(JSON.stringify({ state: "ready" })); GOS.androidSpeech(JSON.stringify({ partial: (said || "").split(" ")[0] })); GOS.androidSpeech(JSON.stringify(said ? { final: said } : { error: "no-match" })); }, 60); },
+    stopListening() { rec("stopListening"); }, speak(t) { rec("speak", t); },
+    findContact(n) { rec("findContact", n); if (!window.__contactsOk) { window.__contactsOk = true; return JSON.stringify({ permission: true }); } return /mia/i.test(n) ? JSON.stringify({ name: "Mia Chen", number: "+15550101" }) : "{}"; },
+    dial(n) { rec("dial", n); return true; }, sms(n, b) { rec("sms", n, b); return true; }, setAlarm(h, m, l) { rec("setAlarm", h, m, l); return true; }, setTimer(sec, l) { rec("setTimer", sec, l); return true; },
+    navigate(q) { rec("navigate", q); return true; }, webSearch(q) { rec("webSearch", q); return true; }, openCamera() { rec("openCamera"); return true; },
+    isAssistant() { return false; }, chooseAssistant() { rec("chooseAssistant"); },
   };
 };
 
@@ -160,6 +167,49 @@ const BRIDGE = () => {
   await page.evaluate(() => [...document.querySelectorAll('.win[data-app="store"] .row')].find(r => /Google Play/.test(r.textContent)).click()); await page.waitForTimeout(200);
   check("Store searches Google Play for real apps", (await calls()).some(c => c[0] === "openPlayStore" && c[1] === "maps"));
   await page.evaluate(() => GOS.goHome()); await page.waitForTimeout(600);
+
+  // the assistant ("Siri") on Android: voice in and out, and real actions through the phone's own apps
+  await page.evaluate(() => { GOS.goHome(); document.querySelectorAll("#sheetLayer > *").forEach(x => x.remove()); });
+  await page.evaluate(() => { window.__heard = "set a timer for 2 minutes"; GOS.openAssistant("test"); }); await page.waitForTimeout(200);
+  await page.click("#asMic"); await page.waitForTimeout(400);
+  let c3 = await calls();
+  check("the mic uses Android's speech recognizer", c3.some(c => c[0] === "startListening"));
+  check("a spoken timer request sets a real timer in the phone's Clock", c3.some(c => c[0] === "setTimer" && c[1] === 120));
+  check("the island still shows the countdown, without ringing twice", await page.evaluate(() => GOS.timerState.end > Date.now() && GOS.timerState.silent === true));
+  check("replies are spoken with the phone's voice", c3.some(c => c[0] === "speak" && /Timer set/.test(c[1])));
+  await page.evaluate(() => { GOS.stopTimer(); GOS.handleAsk("set an alarm for 7:30 am"); });
+  check("alarms go into the phone's Clock app", (await calls()).some(c => c[0] === "setAlarm" && c[1] === 7 && c[2] === 30));
+  await page.evaluate(() => GOS.handleAsk("call Mia")); await page.waitForTimeout(100);
+  check("calling a name first asks for Contacts access", (await calls()).some(c => c[0] === "findContact") && await page.evaluate(() => [...document.querySelectorAll(".as-msg")].some(m => /Allow Contacts access/.test(m.textContent))));
+  await page.evaluate(() => GOS.androidSpeech(JSON.stringify({ contacts: true }))); await page.waitForTimeout(150);
+  check("…then retries and opens the dialer with the contact's number", (await calls()).some(c => c[0] === "dial" && c[1] === "+15550101"));
+  await page.evaluate(() => GOS.handleAsk("text Mia saying running 5 minutes late"));
+  check("messages open pre-filled in the phone's messaging app", (await calls()).some(c => c[0] === "sms" && c[1] === "+15550101" && /running 5 minutes late/.test(c[2])));
+  await page.evaluate(() => GOS.handleAsk("call 555 0199"));
+  check("plain numbers are dialled as they are", (await calls()).some(c => c[0] === "dial" && c[1] === "5550199"));
+  await page.evaluate(() => { GOS.openAssistant("test"); GOS.handleAsk("navigate to Golden Gate Bridge"); });
+  check("directions open the phone's maps app", (await calls()).some(c => c[0] === "navigate" && /golden gate bridge/i.test(c[1])));
+  await page.evaluate(() => { GOS.openAssistant("test"); GOS.handleAsk("google liquid glass design"); });
+  check("web searches open the phone's browser", (await calls()).some(c => c[0] === "webSearch" && /liquid glass design/.test(c[1])));
+  await page.evaluate(() => { GOS.openAssistant("test"); GOS.handleAsk("turn on wifi"); });
+  check("Wi-Fi requests open Android's Wi-Fi panel", (await calls()).filter(c => c[0] === "openPanel" && c[1] === "wifi").length >= 1);
+  await page.evaluate(() => { GOS.openAssistant("test"); GOS.handleAsk("open chatmate"); }); await page.waitForTimeout(200);
+  check("“open” launches the phone's own app", (await calls()).some(c => (c[0] === "launch" || c[0] === "launchFrom") && c[1] === "com.example.chatmate"));
+  await page.evaluate(() => GOS.goHome()); await page.waitForTimeout(400);
+
+  // the assistant over another app (the phone's assistant gesture)
+  const asst = await ctx.newPage(); asst.on("pageerror", e => errors.push("assist: " + e.message));
+  await asst.route(/^https?:\/\/(?!localhost)/, r => r.abort());
+  await asst.addInitScript(() => { window.__heard = "what time is it"; });
+  await asst.goto(url.replace("&fast", "&panel=assist"));
+  await asst.waitForFunction(() => window.GOS && GOS.state.booted, null, { timeout: 8000 }); await asst.waitForTimeout(900);
+  check("the assistant gesture opens the assistant over the current app and starts listening", await asst.evaluate(() => document.querySelector("#assistant").classList.contains("on") && window.__bridgeCalls.some(c => c[0] === "startListening")));
+  check("…and answers out loud", await asst.evaluate(() => window.__bridgeCalls.some(c => c[0] === "speak" && /It's/.test(c[1]))));
+  await asst.screenshot({ path: path.join(shots, "android-assistant.png") });
+  await asst.mouse.click(206, 260);   // tap outside the conversation
+  await asst.waitForTimeout(500);
+  check("closing it closes the overlay", await asst.evaluate(() => window.__bridgeCalls.some(c => c[0] === "closePanel")));
+  await asst.close();
 
   // Back gesture closes overlays and never leaves Home
   await page.evaluate(() => GOS.openSpotlight("bank")); await page.waitForTimeout(300);

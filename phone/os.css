@@ -538,3 +538,34 @@ body.android.tablet #screen { border-radius: 40px; }
 .lib-hidden { display: grid !important; place-items: center; color: rgba(255,255,255,.85); }
 .lib-hidden svg { width: 46%; height: 46%; }
 .cell .unhide { margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(var(--tint), .7); border-radius: 10px; padding: 3px 9px; }
+
+/* ---------- Liquid Glass ---------- */
+/* lensing: the backdrop bends at the edges of each glass piece (Chromium); everywhere else keeps the frosted blur */
+.lg-refract #dock, .lg-refract .ccm, .lg-refract .cc-conn, .lg-refract .ntf, .lg-refract .tabbar, .lg-refract #searchPill,
+.lg-refract .sp-field, .lg-refract .lib-search, .lg-refract .today-search, .lg-refract .lw, .lg-refract .lock-btn, .lg-refract .ctx, .lg-refract .as-group {
+  backdrop-filter: url(#lg-lens) blur(calc(3px + var(--glass) * 12px)) saturate(1.9) brightness(1.04);
+  -webkit-backdrop-filter: url(#lg-lens) blur(calc(3px + var(--glass) * 12px)) saturate(1.9) brightness(1.04);
+}
+/* specular rim: a thin bright edge whose brightest point follows the tilt of the phone */
+#dock::before, .ccm::before, .ntf::before, .tabbar::before, .lib-folder::before, .lw::before, .lock-btn::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; padding: 1.2px; z-index: 0;
+  background: radial-gradient(160px 110px at calc(var(--lgx, .32) * 100%) calc(var(--lgy, .18) * 100%), rgba(255,255,255,.85), rgba(255,255,255,.16) 62%, rgba(255,255,255,.06)),
+              radial-gradient(140px 100px at calc((1 - var(--lgx, .32)) * 100%) calc((1 - var(--lgy, .18)) * 100%), rgba(255,255,255,.35), rgba(255,255,255,0) 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.lw, .lock-btn { position: absolute; }
+#lockWidgets .lw { position: relative; }
+.reduce #dock::before, .reduce .ccm::before, .reduce .ntf::before, .reduce .tabbar::before { opacity: .5; }
+/* adaptive ink on light wallpapers */
+.wall-light #home .page .cell .lbl, .wall-light .today-date, .wall-light .lib-name { color: #1d1d1f; text-shadow: none; }
+.wall-light #dots i { background: rgba(0,0,0,.25); } .wall-light #dots i.on { background: rgba(0,0,0,.75); }
+.wall-light #homeBar { background: #1d1d1f; }
+.wall-light #cover:not(.nc) #lockClock { background: linear-gradient(180deg, rgba(20,22,34,.92), rgba(20,22,34,.72)); -webkit-background-clip: text; background-clip: text; }
+.wall-light #cover:not(.nc) #lockDate, .wall-light #cover:not(.nc) #lockHint { color: #1d1d1f; }
+.wall-light.locked #status { color: #1d1d1f; }
+.wall-light #cover:not(.nc) .lw { color: #1d1d1f; background: rgba(255,255,255,.38); }
+.wall-light #cover:not(.nc) .nc-head { color: #1d1d1f; }
+.wall-light #cover:not(.nc) .nc-head button { background: rgba(0,0,0,.08); }
+
+/* the assistant glow breathes with your voice while listening */
+#assistant .as-glow { opacity: calc(.55 + var(--voice, 0) * .45); transition: opacity .12s; }

@@ -502,7 +502,7 @@ const WALLPAPERS = [
   { name: "Graphite", css: "radial-gradient(100% 60% at 50% 0%, #5c6270 0%, transparent 60%), linear-gradient(180deg, #2a2d34, #0c0d10)" },
   { name: "Orchid", css: "conic-gradient(from 200deg at 50% 40%, #ff9ad5, #a18cd1, #6a85f1, #ff9ad5)" },
   { name: "Nightfall", css: "radial-gradient(80% 50% at 70% 20%, #4b6cb7 0%, transparent 60%), radial-gradient(80% 60% at 20% 70%, #6a3093 0%, transparent 60%), linear-gradient(180deg, #0f0c29, #000)" },
-  { name: "Sandstone", css: "linear-gradient(160deg, #f6d365 0%, #fda085 45%, #c0587e 100%)" },
+  { name: "Sandstone", css: "linear-gradient(160deg, #f6d365 0%, #fda085 45%, #c0587e 100%)", light: false },
 ];
 /* Scenic wallpapers, painted on the device from code (no photos): layered ridges, a lake, aurora, dunes and glass shapes.
    Deterministic, so every phone paints the same picture. */
@@ -567,6 +567,8 @@ function applySettings(k) {
   $("#dim").style.opacity = state.awake ? (1 - S.brightness) * .72 : 1;
   screen.style.filter = S.nightShift ? "sepia(.25) saturate(1.1) hue-rotate(-12deg)" : "";
   screen.style.fontWeight = S.boldText ? 600 : "";
+  if (!k || k === "wallpaper") setTimeout(wallpaperLuma, 0);
+  if (k === "reduceTransparency" && screen) screen.classList.toggle("lg-refract", /Chrome\/\d+/.test(navigator.userAgent) && !S.reduceTransparency);
   const wp = wallpaperCSS(); $("#wall").style.background = wp; document.documentElement.style.setProperty("--tablet-wall", wp);
   if (coverEl) coverEl.querySelector(".bg").style.background = wp;
   $("#lockClock").className = "f" + (S.lockFont + 1);
@@ -592,7 +594,8 @@ function statusInk() {
   const appInk = state.front && !state.switcher && !state.spotlight && !(coverEl && coverEl.classList.contains("on")) && !state.ccOpen;
   const dark = screen.classList.contains("dark");
   const a = state.front && apps[state.front];
-  const ink = appInk && !dark && (a ? a.status !== "light" : true);
+  const onHome = !state.front && !state.switcher && !state.spotlight && !state.ccOpen;
+  const ink = (appInk && !dark && (a ? a.status !== "light" : true)) || (onHome && screen.classList.contains("wall-light"));
   $("#status").classList.toggle("ink", !!ink);
   $("#homeBarZone").classList.toggle("ink", !!ink);
 }
@@ -1507,7 +1510,7 @@ const live = {
 };
 const recState = { on: false, start: 0 }, callState = { on: false, start: 0 };
 function fmtDur(ms) { ms = Math.max(0, ms); const s = Math.ceil(ms / 1000), hh = Math.floor(s / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60; return (hh ? hh + ":" + String(mm).padStart(2, "0") : mm) + ":" + String(ss).padStart(2, "0"); }
-function startTimer(ms, label = "Timer") { timerState.end = Date.now() + ms; timerState.total = ms; timerState.label = label; saved.timer = timerState; persist(); live.update(); emit("timer"); }
+function startTimer(ms, label = "Timer", { silent = false } = {}) { timerState.end = Date.now() + ms; timerState.total = ms; timerState.label = label; timerState.silent = silent; saved.timer = timerState; persist(); live.update(); emit("timer"); }
 function stopTimer() { timerState.end = 0; saved.timer = timerState; persist(); live.update(); emit("timer"); }
 function islandPointer(e) {
   if (!state.booted) return;
@@ -1693,13 +1696,36 @@ function openAssistant(via) {
   setTimeout(() => $("#asInput").focus(), 80);
 }
 function openAssistantWith(q) { closeSpotlight(); openAssistant("text"); $("#asLog").innerHTML = ""; handleAsk(q); }
-function closeAssistant() { assistantOn = false; $("#assistant").classList.remove("on"); live.update(); if (recog) try { recog.stop(); } catch {} }
+function closeAssistant() { const was = assistantOn; assistantOn = false; $("#assistant").classList.remove("on"); live.update(); if (recog) try { recog.stop(); } catch {}
+  if (was && PANEL === "assist") setTimeout(panelDone, 250);   // let an app it opened start first
+}
 function greeting() { const hr = new Date().getHours(); return `${hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening"}. What can I do for you?`; }
 function asSay(text, chips = [], { speak = false } = {}) {
   const el = h("div.as-msg", text);
   chips.forEach(c => el.append(h("button", { onclick: () => { if (!asChip(c)) handleAsk(c.q); } }, c.label)));
   $("#asLog").append(el); $("#asLog").scrollTop = 1e6;
-  if (speak && window.speechSynthesis && !S.silent) { try { const u = new SpeechSynthesisUtterance(text); u.volume = S.volume; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {} }
+  if (speak && !S.silent) {
+    const A = window.GlasslineAndroid;
+    if (A && A.speak) { try { A.speak(text); } catch {} }
+    else if (window.speechSynthesis) { try { const u = new SpeechSynthesisUtterance(text); u.volume = S.volume; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {} }
+  }
+}
+/* voice events from the Android app's speech recognizer (partial words, final text, level, errors) */
+let pendingContactAsk = null, lastAsk = "";
+function androidSpeech(json) {
+  let m; try { m = JSON.parse(json); } catch { return; }
+  const mic = $("#asMic"), inp = $("#asInput");
+  if (m.state === "ready" || m.state === "speaking") mic.classList.add("rec");
+  if (m.level != null) $("#assistant").style.setProperty("--voice", Math.min(1, m.level / 10).toFixed(2));
+  if (m.partial != null) inp.value = m.partial;
+  if (m.final != null) { mic.classList.remove("rec"); inp.value = ""; if (String(m.final).trim()) handleAsk(m.final); }
+  if (m.error) {
+    mic.classList.remove("rec");
+    const msg = { unavailable: "Speech recognition isn't available on this phone. You can type instead.", denied: "Microphone access is off. Allow it for Glassline in Android Settings to talk to me.",
+      "no-match": "Sorry, I didn't catch that.", timeout: "I didn't hear anything.", network: "Speech recognition needs a connection right now. You can type instead." }[m.error];
+    if (msg && assistantOn) asSay(msg);
+  }
+  if (m.contacts != null) { const q = pendingContactAsk; pendingContactAsk = null; if (m.contacts && q) handleAsk(q); else if (!m.contacts && assistantOn) asSay("Without Contacts access I can only call or text numbers."); }
 }
 function screenEntities() {
   const front = state.front && state.windows[state.front];
@@ -1750,7 +1776,8 @@ function matchIntent(raw) {
   if ((m = raw.match(/^run (?:the )?(?:shortcut )?(.+?)(?: shortcut)?$/i))) return { name: "shortcut", which: m[1], describe: `Run shortcut “${m[1]}”` };
   if (/^lock( (the )?(phone|screen))?$/.test(q)) return { name: "lock", describe: "Lock the phone" };
   if (/(app )?switcher|recent apps|multitask/.test(q)) return { name: "switcher", describe: "Show the app switcher" };
-  if ((m = q.match(/^(?:search(?: for)?|find|look up)\s+(.+)$/))) return { name: "search", q: m[1], describe: `Search for ${m[1]}` };
+  if ((m = q.match(/^(?:google|search (?:the web|google|online) for|look up)\s+(.+)$/))) return { name: "websearch", q: m[1], describe: `Search the web for ${m[1]}` };
+  if ((m = q.match(/^(?:search(?: for)?|find)\s+(.+)$/))) return { name: "search", q: m[1], describe: `Search for ${m[1]}` };
   if ((m = q.match(/^(?:navigate|directions|take me) to\s+(.+)$/))) return { name: "maps", q: m[1], describe: `Find ${m[1]} in Maps` };
   if ((m = q.match(/^translate\s+(.+?)\s+(?:to|into)\s+(\w+)$/))) return { name: "translate", text: m[1], lang: m[2], describe: `Translate to ${m[2]}` };
   if (/glass|transparen/.test(q) && /(clear|tint|more|less)/.test(q)) return { name: "glass", v: /clear|less/.test(q) ? 10 : 100, describe: "Adjust the glass material" };
@@ -1767,10 +1794,16 @@ function findApp(name) {
 function runIntent(it) {
   const say = (t, chips, o) => assistantOn ? asSay(t, chips, { speak: true, ...o }) : toast(t);
   switch (it.name) {
-    case "timer": startTimer(it.ms); return say(`Timer set for ${fmtDur(it.ms)}.`);
+    case "timer":
+      if (P().setTimer && P().setTimer(it.ms)) { startTimer(it.ms, "Timer", { silent: true }); return say(`Timer set for ${fmtDur(it.ms)}. It's in your Clock app too.`); }
+      startTimer(it.ms); return say(`Timer set for ${fmtDur(it.ms)}.`);
     case "stoptimer": stopTimer(); return say("Timer cancelled.");
-    case "alarm": emit("add-alarm", it.time); return say(`Alarm set for ${it.time}.`);
+    case "alarm":
+      if (P().setAlarm && P().setAlarm(it.time)) return say(`Alarm set for ${it.time} in your Clock app.`);
+      emit("add-alarm", it.time); return say(`Alarm set for ${it.time}.`);
     case "toggle":
+      if (["wifi", "bluetooth", "airplane", "cellular", "hotspot"].includes(it.key) && P().toggle && P().toggle(it.key))
+        return say("Android doesn't let apps switch that directly, so I've opened its controls for you.");
       if (it.key === "dark") set("appearance", "dark"); else if (it.key === "light") set("appearance", "light");
       else if (it.key === "torch") torch(it.on); else if (it.key === "focus") set("focus", it.on ? "Do Not Disturb" : null); else set(it.key, it.on);
       return say(`${it.describe.replace(/^Turn/, "Turned")}.`);
@@ -1787,9 +1820,13 @@ function runIntent(it) {
     case "calc": { const r = calcAnswer(it.expr); return say(r ? r : "I couldn't calculate that."); }
     case "reminder": emit("add-reminder", it.text); return say(`Added “${it.text}” to Reminders.`, [{ label: "Show Reminders", q: "open reminders" }]);
     case "note": emit("add-note", it.text); return say(it.text ? "Noted." : "Opening a new note.", [{ label: "Open Notes", q: "open notes" }]);
-    case "message": emit("send-message", { to: it.to, text: it.text }); return say(`Sent to ${it.to}: “${it.text}”`, [{ label: "Open Messages", q: "open messages" }]);
-    case "call": closeAssistant(); return open("phone", null, { intent: { call: it.to } });
-    case "camera": closeAssistant(); return open("camera", null, { intent: { front: it.front } });
+    case "message":
+      if (P().message) { const r = P().message(it.to, it.text); if (r.retry) pendingContactAsk = lastAsk; return say(r.message); }
+      emit("send-message", { to: it.to, text: it.text }); return say(`Sent to ${it.to}: “${it.text}”`, [{ label: "Open Messages", q: "open messages" }]);
+    case "call":
+      if (P().call) { const r = P().call(it.to); if (r.retry) pendingContactAsk = lastAsk; return say(r.message); }
+      closeAssistant(); return open("phone", null, { intent: { call: it.to } });
+    case "camera": closeAssistant(); if (P().camera && P().camera()) return; return open("camera", null, { intent: { front: it.front } });
     case "install": install(it.app); return say(`Getting ${apps[it.app].name}. It will appear on your Home Screen.`);
     case "open": closeAssistant(); return open(it.app);
     case "home": closeAssistant(); return goHome();
@@ -1800,7 +1837,8 @@ function runIntent(it) {
     case "cc": closeAssistant(); return openCC();
     case "nc": closeAssistant(); return openNC();
     case "search": closeAssistant(); return openSpotlight(it.q);
-    case "maps": closeAssistant(); return open("maps", null, { intent: { q: it.q } });
+    case "maps": closeAssistant(); if (P().navigate && P().navigate(it.q)) return; return open("maps", null, { intent: { q: it.q } });
+    case "websearch": closeAssistant(); if (P().webSearch && P().webSearch(it.q)) return; return open("browser", null, { intent: { search: it.q } });
     case "translate": closeAssistant(); return open("translate", null, { intent: { text: it.text, lang: it.lang } });
     case "glass": set("glass", it.v); return say(`Glass set to ${it.v < 50 ? "clear" : "tinted"}.`);
     case "help": return say("I can open and install apps, set timers and alarms, toggle settings, play music, send messages, make calls, create notes and reminders, do maths and unit conversions, read the weather, summarize notifications and tell you what's on screen. I run on this device with rules, not a large language model.");
@@ -1808,7 +1846,7 @@ function runIntent(it) {
   }
 }
 function handleAsk(text) {
-  text = String(text || "").trim(); if (!text) return;
+  text = String(text || "").trim(); if (!text) return; lastAsk = text;
   asSay(text); $("#asLog").lastChild.classList.add("me");
   const it = matchIntent(text);
   if (it) return runIntent(it);
@@ -1888,7 +1926,7 @@ async function boot() {
     $("#boot").style.display = "none"; state.booted = true; state.locked = false; state.mode = "home"; state.awake = true;
     screen.classList.remove("booting", "locked", "screen-off"); applySettings();
     emit("booted");
-    if (PANEL === "cc") openCC(); else openNC();
+    if (PANEL === "cc") openCC(); else if (PANEL === "assist") { openAssistant("assist"); setTimeout(() => { const A = window.GlasslineAndroid; if (A && A.startListening) $("#asMic").click(); }, 350); } else openNC();
     return;
   }
   state.mode = "boot"; screen.classList.add("booting"); screen.classList.remove("screen-off");
@@ -1906,6 +1944,53 @@ async function boot() {
   coverShow("lock"); wake(); scheduleIncoming();
   if (!saved.welcomed) { saved.welcomed = true; persist(); setTimeout(() => notify({ app: "tips", title: "Welcome to Glassline", body: "Swipe up from the bottom to open. Pull down from the top right for Control Centre.", open: true }), 1500); }
   emit("booted");
+}
+
+/* ---------- Liquid Glass: lensing, a moving specular rim and adaptive ink ----------
+   Behaviour follows Apple's public description of the material (WWDC25 "Meet Liquid Glass"): light bends at the edges
+   (larger pieces bend more), highlights respond to movement, and small content flips light or dark with what is
+   behind it. Everything here is original code: the refraction map is generated on the device. */
+function liquidGlassSetup() {
+  // refraction needs SVG filters inside backdrop-filter, which Chromium (Chrome, Edge, Android WebView, Samsung Internet) supports
+  const chromium = /Chrome\/\d+/.test(navigator.userAgent);
+  if (chromium && !document.getElementById("lg-lens")) {
+    const n = 128, c = document.createElement("canvas"); c.width = c.height = n; const g = c.getContext("2d"), img = g.createImageData(n, n);
+    const r = .22, band = .17;                                  // corner radius and refraction band, as fractions of the shape
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const u = (x + .5) / n, v = (y + .5) / n;
+      // distance to the edge of a rounded rectangle, and the inward direction
+      const qx = Math.max(Math.abs(u - .5) - (.5 - r), 0), qy = Math.max(Math.abs(v - .5) - (.5 - r), 0);
+      const inCorner = qx > 0 && qy > 0, ql = Math.hypot(qx, qy);
+      const dist = inCorner ? r - ql : Math.min(.5 - Math.abs(u - .5), .5 - Math.abs(v - .5));
+      let nx = 0, ny = 0;
+      if (inCorner) { nx = -Math.sign(u - .5) * qx / (ql || 1); ny = -Math.sign(v - .5) * qy / (ql || 1); }
+      else if (.5 - Math.abs(u - .5) < .5 - Math.abs(v - .5)) nx = -Math.sign(u - .5); else ny = -Math.sign(v - .5);
+      const k = Math.max(0, 1 - Math.max(0, dist) / band), s2 = k * k * (3 - 2 * k);   // smooth falloff into the middle
+      const i = (y * n + x) * 4; img.data[i] = 128 + nx * 127 * s2; img.data[i + 1] = 128 + ny * 127 * s2; img.data[i + 2] = 128; img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    const holder = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    holder.setAttribute("width", "0"); holder.setAttribute("height", "0"); holder.setAttribute("aria-hidden", "true"); holder.style.position = "absolute";
+    holder.innerHTML = `<filter id="lg-lens" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feImage href="${c.toDataURL()}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map"/><feDisplacementMap in="SourceGraphic" in2="map" scale="26" xChannelSelector="R" yChannelSelector="G"/></filter>`;
+    document.body.append(holder);
+  }
+  screen.classList.toggle("lg-refract", chromium && !S.reduceTransparency);
+  // specular highlight follows the phone's tilt (or the pointer on a computer)
+  let pending = null;
+  const setLight = (x, y) => { if (pending) return; pending = requestAnimationFrame(() => { pending = null; document.documentElement.style.setProperty("--lgx", clamp(x, 0, 1).toFixed(3)); document.documentElement.style.setProperty("--lgy", clamp(y, 0, 1).toFixed(3)); }); };
+  addEventListener("deviceorientation", e => { if (e.gamma == null || S.reduceMotion) return; setLight(.5 + e.gamma / 70, .15 + (e.beta - 45) / 120); });
+  addEventListener("pointermove", e => { if (S.reduceMotion || e.pointerType === "touch") return; setLight(e.clientX / innerWidth, e.clientY / innerHeight * .6); }, { passive: true });
+}
+/* adaptive ink: dark labels, clock and status bar on light wallpapers */
+function wallpaperLuma() {
+  const w = S.wallpaper, entry = typeof w === "number" ? WALLPAPERS[w] : null;
+  const done = l => { screen.classList.toggle("wall-light", l > .6); statusInk(); };
+  if (entry && entry.light != null) return done(entry.light ? 1 : 0);
+  const src = typeof w === "string" ? w : entry && entry.scene ? (entry.css.match(/url\("([^"]+)"\)/) || [])[1] : null;
+  if (!src) return done(0);
+  const im = new Image(); im.onload = () => { try { const c = document.createElement("canvas"); c.width = 12; c.height = 26; const g = c.getContext("2d"); g.drawImage(im, 0, 0, 12, 26);
+    const d = g.getImageData(0, 3, 12, 18).data; let sum = 0; for (let i = 0; i < d.length; i += 4) sum += (.2126 * d[i] + .7152 * d[i + 1] + .0722 * d[i + 2]) / 255; done(sum / (d.length / 4)); } catch { done(0); } };
+  im.onerror = () => done(0); im.src = src;
 }
 
 /* ---------- fit the device to the window ---------- */
@@ -1941,7 +2026,8 @@ function tick() {
   renderStatus();
   if (coverEl.classList.contains("on")) { $("#lockClock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s?[AP]M/i, ""); }
   if (timerState.end) {
-    if (Date.now() >= timerState.end) { const label = timerState.label; stopTimer(); SOUND.alarm(); wakeBrief(); notify({ app: "clock", title: label, body: "Timer done", breakthrough: true, intent: { tab: "timer" } }); haptic(300); }
+    if (Date.now() >= timerState.end && timerState.silent) stopTimer();   // the phone's Clock app rings for this one
+    else if (Date.now() >= timerState.end) { const label = timerState.label; stopTimer(); SOUND.alarm(); wakeBrief(); notify({ app: "clock", title: label, body: "Timer done", breakthrough: true, intent: { tab: "timer" } }); haptic(300); }
     else live.update();
   }
   if (recState.on || callState.on) live.update();
@@ -1958,7 +2044,7 @@ function start() {
   const known = new Set(saved.knownApps || []);
   if (saved.knownApps) Object.values(apps).filter(a => a.builtin && !a.hidden && !known.has(a.id) && isInstalled(a.id)).forEach(a => placeApp(a.id));
   saved.knownApps = Object.keys(apps); persist();
-  addEventListener("resize", fit); fit();
+  addEventListener("resize", fit); fit(); liquidGlassSetup();
   applySettings(); renderStatus(); renderHome();
   // pad
   const pad = $(".pc-pad"); [["1", ""], ["2", "ABC"], ["3", "DEF"], ["4", "GHI"], ["5", "JKL"], ["6", "MNO"], ["7", "PQRS"], ["8", "TUV"], ["9", "WXYZ"], ["", ""], ["0", ""], ["", ""]].forEach(([n, l]) => pad.append(n ? h("button", { onclick: e => { e.stopPropagation(); pcKey(n); } }, n, h("small", l)) : h("span")));
@@ -1966,6 +2052,8 @@ function start() {
   $("#pcEmergency").onclick = e => { e.stopPropagation(); toast("Emergency calls aren't possible from a browser"); };
   // listeners
   $("#homeBarZone").addEventListener("pointerdown", homeBarPointer);
+  let lastBarTap = 0;   // double-tap the bottom edge to type to the assistant
+  $("#homeBarZone").addEventListener("click", () => { const now = Date.now(); if (now - lastBarTap < 350 && !state.locked) { lastBarTap = 0; openAssistant("type"); } else lastBarTap = now; });
   screen.addEventListener("pointerdown", topPointer, true);
   pagesEl.addEventListener("pointerdown", homePointer);
   coverEl.addEventListener("pointerdown", coverPointer);
@@ -1978,6 +2066,8 @@ function start() {
   $("#asForm").onsubmit = e => { e.preventDefault(); const v = $("#asInput").value; $("#asInput").value = ""; handleAsk(v); };
   $("#assistant").addEventListener("pointerdown", e => { if (e.target.id === "assistant") closeAssistant(); });
   $("#asMic").onclick = () => {
+    const A = window.GlasslineAndroid;
+    if (A && A.startListening) { if ($("#asMic").classList.contains("rec")) { A.stopListening && A.stopListening(); return; } $("#asMic").classList.add("rec"); A.startListening(); return; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return asSay("Speech recognition isn't available in this browser. Type instead.");
     recog = new SR(); recog.lang = navigator.language || "en-US"; recog.interimResults = false; $("#asMic").classList.add("rec");
@@ -2004,7 +2094,7 @@ window.GOS = {
   notify, toast, sheet, alert: alertBox, prompt: prompt_, share, ctxMenu, overlay, hud, torch: v => torch(v), get torchOn() { return torchOn; },
   settings: S, set, on, emit, appStore, media, battery, live, startTimer, stopTimer, timerState, recState, callState, fmtDur,
   weatherNow, setWeather, WALLPAPERS, wallpaperCSS, WIDGETS, summarize, matchIntent, runIntent, handleAsk, openAssistant, openSpotlight, openCC, openNC, showSwitcher,
-  screenEntities, isHidden, isLocked, hideApp, unhideApp, authenticate, openHiddenFolder, setBadge, standby, folders, openFolder, mergeIntoFolder, badges, state, saved, persist, layout, renderHome, index, calcAnswer, start, boot, makeStack, asChip, findApp,
+  androidSpeech, screenEntities, isHidden, isLocked, hideApp, unhideApp, authenticate, openHiddenFolder, setBadge, standby, folders, openFolder, mergeIntoFolder, badges, state, saved, persist, layout, renderHome, index, calcAnswer, start, boot, makeStack, asChip, findApp,
   reset() { localStorage.removeItem(KEY); location.reload(); },
   androidBack() {
     if (PANEL) { closeOverlays(); panelDone(); return true; }
