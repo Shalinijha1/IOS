@@ -24,9 +24,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"
+          # Save the downloaded build tools on every branch (by default only the main branch saves them),
+          # so later builds reuse them instead of downloading everything from Maven Central again.
+          cache-read-only: false
       - name: Build APK
         working-directory: android
-        run: gradle --no-daemon assembleRelease
+        # Maven Central sometimes answers "429 Too Many Requests" to GitHub's shared machines. Gradle retries each
+        # download with growing pauses, and if the whole build still fails it waits and tries again (three times).
+        run: |
+          for attempt in 1 2 3; do
+            if gradle --no-daemon -Dorg.gradle.internal.repository.max.retries=8 -Dorg.gradle.internal.repository.initial.backoff=2000 assembleRelease; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then echo "::warning::Build attempt $attempt failed; retrying in $((attempt * 90)) seconds"; sleep $((attempt * 90)); fi
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: GlasslineOS-android
